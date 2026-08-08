@@ -29,7 +29,7 @@ export default function LoginPage() {
       const snap = await getDocs(q);
 
       if (snap.empty) {
-        setError("User not found. Check your username.");
+        setError("User not found. Check your username. (Did you forget to seed the database?)");
       } else {
         const userDoc = snap.docs[0];
         const userData = { uid: userDoc.id, ...userDoc.data() };
@@ -37,6 +37,23 @@ export default function LoginPage() {
       }
     } catch (err: any) {
       setError(err.message || "An error occurred during login.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleSeed = async () => {
+    setIsLoading(true);
+    setError("");
+    try {
+      const res = await fetch('/api/seed');
+      if (res.ok) {
+        setError("Database seeded successfully! You can now log in.");
+      } else {
+        setError("Failed to seed database.");
+      }
+    } catch (e: any) {
+      setError(e.message);
     } finally {
       setIsLoading(false);
     }
@@ -95,7 +112,16 @@ export default function LoginPage() {
             <li><strong>Hospitals:</strong> hospital1, hospital2</li>
             <li><strong>Doctors:</strong> doctor1, doctor2, doctor3</li>
           </ul>
-          <p className="mt-4 italic">Password for all accounts is <strong>password</strong></p>
+          <p className="mt-4 italic mb-6">Password for all accounts is <strong>password</strong></p>
+
+          <button 
+            type="button"
+            onClick={handleSeed}
+            disabled={isLoading}
+            className="w-full py-2 bg-blue-600/20 text-blue-400 border border-blue-500/50 hover:bg-blue-600 hover:text-white rounded-lg font-bold transition disabled:opacity-50"
+          >
+            {isLoading ? "Seeding..." : "Seed Database"}
+          </button>
         </div>
       </div>
     </div>
