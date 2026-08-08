@@ -21,8 +21,8 @@ async function getEmbedding(text: string): Promise<number[]> {
     return data.embedding;
   } catch (error) {
     console.warn("Local Ollama not reachable (likely on Vercel). Using mock deterministic vector for demo.");
-    // Return a mock 768-dimensional vector (nomic-embed-text dimension size) so the Vercel demo works smoothly.
-    return new Array(768).fill(0.1);
+    // Return a mock 1024-dimensional vector to match the Pinecone index dimension size.
+    return new Array(1024).fill(0.1);
   }
 }
 
@@ -51,7 +51,7 @@ Return ONLY the JSON object, with no markdown formatting or other text.`;
         { role: 'system', content: systemPrompt },
         { role: 'user', content: symptoms }
       ],
-      model: 'llama3-8b-8192',
+      model: 'llama-3.1-8b-instant',
       temperature: 0,
       response_format: { type: 'json_object' }
     });
@@ -84,11 +84,13 @@ Return ONLY the JSON object, with no markdown formatting or other text.`;
     const embedding = await getEmbedding(triageData.core_symptoms);
 
     // Upsert to Pinecone
-    await medicalRadarIndex.upsert([{
-      id: docRef.id,
-      values: embedding,
-      metadata: { location, timestamp: Date.now() }
-    }] as any);
+    await medicalRadarIndex.upsert({
+      records: [{
+        id: docRef.id,
+        values: embedding,
+        metadata: { location, timestamp: Date.now() }
+      }]
+    });
 
     // Similarity Search (The Radar)
     const queryResponse = await medicalRadarIndex.query({
