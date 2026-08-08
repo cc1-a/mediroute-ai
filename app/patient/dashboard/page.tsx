@@ -43,44 +43,64 @@ export default function PatientDashboard() {
   const fetchDoctors = async (triageResult: any, loc: string) => {
     setLoadingDoctors(true);
     try {
-      // First try matching by location
-      const usersQ = query(collection(db, "Users"), where("location", "==", loc));
-      const usersSnap = await getDocs(usersQ);
-      const validUsers = usersSnap.docs
-        .map(d => ({ uid: d.id, ...(d.data() as any) }))
-        .filter(u => u.role === 'doctor' || u.role === 'hospital');
+      // Fetch all users who are doctors or hospitals
+      const allUsersSnap = await getDocs(
+        query(collection(db, "Users"), where("role", "in", ["doctor", "hospital"]))
+      );
+      const allDoctorUsers = allUsersSnap.docs.map(d => ({ uid: d.id, ...(d.data() as any) }));
 
-      // Then get their profiles
+      // Fetch all doctor profiles
       const profilesSnap = await getDocs(collection(db, "DoctorProfiles"));
+
       const found: any[] = [];
 
       profilesSnap.docs.forEach(p => {
         const pData = p.data() as any;
-        const matchingUser = validUsers.find(u => u.uid === p.id);
-        if (matchingUser) {
+        const matchingUser = allDoctorUsers.find(u => u.uid === p.id);
+        if (!matchingUser) return;
+
+        const isNearby = matchingUser.location === loc;
+        const isOnline = pData.isOnline || matchingUser.isOnline;
+
+        // Show if nearby OR if they offer online consultations (always visible)
+        if (isNearby || isOnline) {
           found.push({
             uid: p.id,
             name: matchingUser.name,
             role: matchingUser.role,
             specialty: pData.specialty,
+            location: matchingUser.location,
             slots: (pData.available_slots || []).filter((s: any) => !s.booked),
-            isOnline: pData.isOnline || matchingUser.isOnline,
+            isOnline,
             meetLink: pData.meetLink,
+            isNearby,
           });
         }
       });
 
-      // If no matching in zone, show all doctors
+      // Sort: nearby first, then online
+      found.sort((a, b) => {
+        if (a.isNearby && !b.isNearby) return -1;
+        if (!a.isNearby && b.isNearby) return 1;
+        return 0;
+      });
+
+      // If still nothing found (no nearby, no online), show everyone
       if (found.length === 0) {
         profilesSnap.docs.forEach(p => {
           const pData = p.data() as any;
+          const matchingUser = allDoctorUsers.find(u => u.uid === p.id);
+          if (!matchingUser) return;
           found.push({
             uid: p.id,
-            name: pData.name || p.id,
+            name: matchingUser.name,
+            role: matchingUser.role,
             specialty: pData.specialty,
+            location: matchingUser.location,
             slots: (pData.available_slots || []).filter((s: any) => !s.booked),
-            isOnline: pData.isOnline,
+            isOnline: pData.isOnline || matchingUser.isOnline,
             meetLink: pData.meetLink,
+            isNearby: false,
           });
         });
       }
@@ -92,6 +112,7 @@ export default function PatientDashboard() {
       setLoadingDoctors(false);
     }
   };
+
 
   const handleSubmitSymptoms = async (skipFollowup = false) => {
     setIsSubmitting(true);
@@ -346,7 +367,7 @@ export default function PatientDashboard() {
                 ) : (
                   <div className="space-y-5">
                     {doctors.map(d => (
-                      <div key={d.uid} className="p-6 rounded-2xl border border-white/10 bg-white/5">
+                      <div key={d.uid} className={`p-6 rounded-2xl border bg-white/5 ${d.isNearby ? 'border-red-500/30' : 'border-white/10'}`}>
                         <div className="flex items-start justify-between mb-5">
                           <div className="flex items-center gap-4">
                             <div className="w-12 h-12 rounded-full bg-red-600 flex items-center justify-center font-black text-xl">
@@ -355,9 +376,15 @@ export default function PatientDashboard() {
                             <div>
                               <h3 className="font-black text-lg text-white">{d.name}</h3>
                               <p className="text-gray-400 text-sm">{d.specialty}</p>
+                              {d.location && <p className="text-gray-600 text-xs mt-0.5">📍 {d.location}</p>}
                             </div>
                           </div>
                           <div className="flex gap-2 flex-wrap justify-end">
+                            {d.isNearby && (
+                              <span className="px-2 py-1 bg-red-900/30 text-red-400 border border-red-500/30 text-xs font-bold rounded-full">
+                                📍 Nearby
+                              </span>
+                            )}
                             {d.role && (
                               <span className="px-2 py-1 bg-white/10 text-gray-300 text-xs font-bold rounded-full uppercase">
                                 {d.role}
@@ -366,7 +393,7 @@ export default function PatientDashboard() {
                             {d.isOnline && (
                               <span className="px-2 py-1 bg-green-900/30 text-green-400 border border-green-500/30 text-xs font-bold rounded-full flex items-center gap-1">
                                 <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
-                                Online Consultation
+                                Online
                               </span>
                             )}
                           </div>
@@ -376,7 +403,7 @@ export default function PatientDashboard() {
                           <p className="text-gray-600 text-sm">No available slots at the moment.</p>
                         ) : (
                           <div>
-                            <p className="text-xs text-gray-500 font-bold uppercase tracking-wider mb-3">Available Slots</p>
+                            <p className="text-xs text-gray-500 font-bold uppercase tracking-wider mb-3">Book a Slot</p>
                             <div className="flex flex-wrap gap-3">
                               {d.slots.map((slot: any, i: number) => (
                                 <button
@@ -389,6 +416,16 @@ export default function PatientDashboard() {
                                 </button>
                               ))}
                             </div>
+                            {d.isOnline && d.meetLink && (
+                              <a
+                                href={d.meetLink}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-2 mt-4 text-xs text-green-400 hover:text-green-300 transition font-bold"
+                              >
+                                🎥 Join via Google Meet after booking
+                              </a>
+                            )}
                           </div>
                         )}
                       </div>
