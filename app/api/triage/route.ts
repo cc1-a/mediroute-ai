@@ -21,7 +21,6 @@ async function getEmbedding(text: string): Promise<number[]> {
     return data.embedding;
   } catch (error) {
     console.warn("Local Ollama not reachable (likely on Vercel). Using mock deterministic vector for demo.");
-    // Return a mock 1024-dimensional vector to match the Pinecone index dimension size.
     return new Array(1024).fill(0.1);
   }
 }
@@ -33,57 +32,74 @@ const groq = new Groq({
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { symptoms, location } = body;
+    const { symptoms, location, skip_followup, patient_uid, patient_name } = body;
 
     if (!symptoms || !location) {
       return NextResponse.json({ error: 'Symptoms and location are required' }, { status: 400 });
     }
 
-    const systemPrompt = `You are an expert AI triage assistant. Extract the following information from the patient's symptoms into a strict JSON object:
-- "core_symptoms": A concise summary of the main symptoms.
+    let triageData: any = {};
+
+    if (skip_followup) {
+      // Patient skipped follow-up questions
+      triageData = {
+        core_symptoms: symptoms,
+        urgency_level: 3,
+        required_specialty: "General"
+      };
+    } else {
+      const systemPrompt = `You are an expert AI triage assistant. Evaluate the patient's symptoms.
+If the symptoms are too vague to determine a specialty or urgency, set "needs_clarification" to true and provide up to 2 "follow_up_questions".
+If the symptoms are clear enough, set "needs_clarification" to false, and provide:
+- "core_symptoms": A concise summary.
 - "urgency_level": An integer from 1 to 5 (1 being lowest, 5 being highest).
-- "required_specialty": The medical specialty required (e.g., General, Dermatology, Cardiology, Neurology, etc.).
+- "required_specialty": The required medical specialty.
 
-Return ONLY the JSON object, with no markdown formatting or other text.`;
+Return ONLY a strict JSON object with these fields, with no markdown formatting.`;
 
-    const chatCompletion = await groq.chat.completions.create({
-      messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: symptoms }
-      ],
-      model: 'llama-3.1-8b-instant',
-      temperature: 0,
-      response_format: { type: 'json_object' }
-    });
+      const chatCompletion = await groq.chat.completions.create({
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: symptoms }
+        ],
+        model: 'llama-3.1-8b-instant',
+        temperature: 0,
+        response_format: { type: 'json_object' }
+      });
 
-    const aiResponse = chatCompletion.choices[0]?.message?.content;
-    
-    if (!aiResponse) {
-      throw new Error('Failed to parse AI response');
+      const aiResponse = chatCompletion.choices[0]?.message?.content;
+      if (!aiResponse) throw new Error('Failed to parse AI response');
+      triageData = JSON.parse(aiResponse);
+
+      if (triageData.needs_clarification) {
+        // Stop here and ask frontend to show questions
+        return NextResponse.json({ 
+          needs_clarification: true, 
+          questions: triageData.follow_up_questions 
+        }, { status: 200 });
+      }
     }
 
-    const triageData = JSON.parse(aiResponse);
-
-    // Save to Firestore
+    // Triage is finalized. Save to Firestore for Admin Review Queue
     const ticketsRef = collection(db, 'Tickets');
     const newTicket = {
-      patient_name: "Demo Patient",
+      patient_uid: patient_uid || "guest_uid",
+      patient_name: patient_name || "Demo Patient",
       raw_symptoms: symptoms,
       core_symptoms: triageData.core_symptoms,
       urgency_level: triageData.urgency_level,
       required_specialty: triageData.required_specialty,
       location: location,
-      status: "pending",
+      status: "pending_admin", // Admin MUST review it next!
       timestamp: serverTimestamp(),
-      assigned_doc_uid: null
+      assigned_doc_uid: null,
+      emergency_flag: false
     };
 
     const docRef = await addDoc(ticketsRef, newTicket);
 
-    // Generate Ollama embedding
+    // Generate Ollama embedding & Upsert to Pinecone
     const embedding = await getEmbedding(triageData.core_symptoms);
-
-    // Upsert to Pinecone
     await medicalRadarIndex.upsert({
       records: [{
         id: docRef.id,
@@ -92,7 +108,7 @@ Return ONLY the JSON object, with no markdown formatting or other text.`;
       }]
     });
 
-    // Similarity Search (The Radar)
+    // Similarity Search for Outbreak Radar
     const queryResponse = await medicalRadarIndex.query({
       vector: embedding,
       topK: 5,
@@ -101,9 +117,7 @@ Return ONLY the JSON object, with no markdown formatting or other text.`;
       includeValues: false
     });
 
-    // Trigger Outbreak Alert
     const matches = queryResponse.matches || [];
-    // Count matches excluding the one just inserted, with score > 0.85
     const highSimilarityMatches = matches.filter(match => match.id !== docRef.id && (match.score || 0) > 0.85);
 
     if (highSimilarityMatches.length >= 3) {
@@ -117,7 +131,12 @@ Return ONLY the JSON object, with no markdown formatting or other text.`;
       });
     }
 
-    return NextResponse.json({ success: true, ticketId: docRef.id, triage: triageData }, { status: 200 });
+    return NextResponse.json({ 
+      success: true, 
+      ticketId: docRef.id, 
+      triage: triageData,
+      status: "pending_admin"
+    }, { status: 200 });
 
   } catch (error: any) {
     console.error('Triage API Error:', error);

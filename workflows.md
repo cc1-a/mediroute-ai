@@ -1,22 +1,29 @@
-# User Journeys & Workflows
+# User Journeys & Workflows (V2)
 
-## A. Ticketing & AI Triage Loop (Patient Side)
-1. Patient logs in and enters natural language symptoms.
-2. Form posts to `/api/triage` with `symptoms` and `location`.
-3. API calls Groq LLM (`llama3-8b-8192`) to extract: `core_symptoms`, `urgency_level (1-5)`, `required_specialty` as JSON.
-4. API saves parsed ticket data to Firestore `Tickets` collection with `status: pending`.
-5. API requests an embedding for `core_symptoms` from local Ollama model (`nomic-embed-text`).
-6. API upserts the generated vector to Pinecone `medical-radar` index with patient `location` and `timestamp`.
-7. API immediately queries Pinecone for top 5 matches with the same location. Trigger "Outbreak Warning" in Firestore `Alerts` collection if >= 3 matches with score > 0.85 are found.
+## A. Intelligent AI Triage & Admin Review (Patient Side)
+1. Patient enters symptoms.
+2. AI (Groq) evaluates. If vague, AI returns `follow_up_questions`.
+3. Patient can answer questions (re-evaluate) or SKIP.
+4. If SKIP, ticket is immediately marked for `General Doctor`.
+5. Triage is finalized and vector is sent to Pinecone. 
+6. Ticket is created with status `pending_admin`.
+7. Admin sees the ticket in their queue and can flag it as `EMERGENCY` or `Standard`.
+8. Once Admin reviews, ticket status changes to `pending_booking`.
 
-## B. Doctor Dashboard (Real-Time Ticketing)
-1. Doctor opens dashboard; UI listens to real-time Firestore updates for `Tickets` where `status == "pending"`.
-2. Doctor reviews AI triage summary, urgency level, and location via the Kanban/data view.
-3. Doctor clicks "Accept Ticket" (`status -> accepted`), removing it from the pending queue.
-4. Doctor conducts consultation (or telehealth for low urgency).
-5. Doctor clicks "Complete", finalizing into `MedicalLogs`.
+## B. Booking & Availability Flow
+1. Doctors/Hospitals log in and set their `available_slots` (e.g., 9:00 AM, 15 mins).
+2. After Admin review, Patient sees a list of available Doctors/Hospitals in their Colombo sub-region matching the specialty.
+3. Patient selects a time slot and books it (`status -> booked`).
+4. Hospitals can handle multiple ticketing lines concurrently.
 
-## C. Admin Outbreak Radar (Real-Time Monitoring)
-1. Admin opens radar; UI listens to real-time Firestore updates for `Alerts` collection.
-2. The grid dynamically highlights locations actively experiencing anomalous symptom clusters.
-3. The live feed scrolls through detected outbreaks and corresponding case counts.
+## C. Doctor Dashboard & Diagnosis
+1. Doctor/Hospital sees their booked appointments in real-time.
+2. Doctor clicks "Start Consultation".
+3. After consultation, Doctor writes `Diagnosis` and `Medicine`.
+4. Ticket is finalized and pushed to `MedicalLogs`.
+
+## D. Seeding & Mock Data
+- We will seed 4 Patients (1 with history).
+- We will seed 1 Admin.
+- We will seed 5 Doctors (2 as Big Hospitals, 3 as Freelance).
+- Focus is exclusively on Colombo sub-regions (e.g., Colombo 1, Colombo 3, Dehiwala).
