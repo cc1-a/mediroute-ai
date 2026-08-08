@@ -8,6 +8,7 @@ export default function DoctorSchedulePage() {
   const [profile, setProfile] = useState<any>(null);
   const [time, setTime] = useState("");
   const [duration, setDuration] = useState("15");
+  const [lineName, setLineName] = useState("");
 
   // Hardcoded for demo to Dr. Strange (doc_freelance_1)
   const doctorUid = "doc_freelance_1";
@@ -26,8 +27,10 @@ export default function DoctorSchedulePage() {
     e.preventDefault();
     if (!profile) return;
     
+    const formattedTime = lineName ? `${time} - ${lineName}` : time;
+
     const newSlot = {
-      time,
+      time: formattedTime,
       duration_mins: parseInt(duration),
       booked: false
     };
@@ -40,6 +43,7 @@ export default function DoctorSchedulePage() {
 
     setProfile({ ...profile, available_slots: updatedSlots });
     setTime("");
+    setLineName("");
   };
 
   if (!profile) return <div className="p-8 text-white">Loading schedule...</div>;
@@ -51,8 +55,8 @@ export default function DoctorSchedulePage() {
         
         <div className="glass-panel p-8 rounded-2xl border border-blue-500/30 mb-8">
           <h2 className="text-xl font-bold mb-6">Add New Available Time Slot</h2>
-          <form onSubmit={handleAddSlot} className="flex gap-4 items-end">
-            <div className="flex-1">
+          <form onSubmit={handleAddSlot} className="flex gap-4 items-end flex-wrap">
+            <div className="flex-1 min-w-[150px]">
               <label className="block text-sm font-bold text-gray-300 mb-2">Time (e.g. 10:30 AM)</label>
               <input 
                 type="text" 
@@ -63,8 +67,18 @@ export default function DoctorSchedulePage() {
                 placeholder="10:30 AM"
               />
             </div>
-            <div className="flex-1">
-              <label className="block text-sm font-bold text-gray-300 mb-2">Duration (mins)</label>
+            <div className="flex-1 min-w-[150px]">
+              <label className="block text-sm font-bold text-gray-300 mb-2">Line / Dr. Name (Hospitals)</label>
+              <input 
+                type="text" 
+                value={lineName}
+                onChange={(e) => setLineName(e.target.value)}
+                className="w-full bg-white/5 border border-white/10 rounded-xl p-3 focus:ring-2 focus:ring-blue-500 outline-none text-white"
+                placeholder="e.g. Dr. Smith / Line 2"
+              />
+            </div>
+            <div className="w-24">
+              <label className="block text-sm font-bold text-gray-300 mb-2">Mins</label>
               <input 
                 type="number" 
                 required
