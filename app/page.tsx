@@ -1,7 +1,11 @@
 "use client";
+
 import Link from 'next/link';
+import { useAuth } from '@/components/AuthProvider';
 
 export default function Home() {
+  const { user } = useAuth();
+
   return (
     <div className="min-h-screen p-8 sm:p-20 flex flex-col items-center justify-center text-white text-center relative overflow-hidden">
       
@@ -19,32 +23,52 @@ export default function Home() {
           Next-Generation AI Triage & Medical Dispatch System.
         </p>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 w-full max-w-2xl mb-8">
-          
-          <Link href="/patient/triage" className="group glass-panel p-8 rounded-2xl border border-white/20 hover:border-red-500 transition-all hover:scale-105">
-            <h2 className="text-2xl font-bold mb-2 text-white">Patient Portal</h2>
-            <p className="text-gray-400 text-sm">Submit symptoms & book doctors</p>
+        {!user ? (
+          <Link href="/login" className="px-12 py-4 bg-red-600 hover:bg-red-700 transition rounded-2xl font-black text-2xl shadow-lg shadow-red-500/50">
+            LOGIN TO CONTINUE
           </Link>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 w-full max-w-2xl mb-8">
+            {user.role === 'patient' && (
+              <>
+                <Link href="/patient/triage" className="group glass-panel p-8 rounded-2xl border border-white/20 hover:border-red-500 transition-all hover:scale-105">
+                  <h2 className="text-2xl font-bold mb-2 text-white">Patient Portal</h2>
+                  <p className="text-gray-400 text-sm">Submit symptoms</p>
+                </Link>
+                <Link href="/patient/booking" className="group glass-panel p-8 rounded-2xl border border-white/20 hover:border-red-500 transition-all hover:scale-105">
+                  <h2 className="text-2xl font-bold mb-2 text-white">Booking Portal</h2>
+                  <p className="text-gray-400 text-sm">View and book doctors</p>
+                </Link>
+              </>
+            )}
+            
+            {user.role === 'admin' && (
+              <>
+                <Link href="/admin/queue" className="group glass-panel p-8 rounded-2xl border border-white/20 hover:border-blue-500 transition-all hover:scale-105">
+                  <h2 className="text-2xl font-bold mb-2 text-white">S.H.I.E.L.D Queue</h2>
+                  <p className="text-gray-400 text-sm">Admin Triage Approval</p>
+                </Link>
+                <Link href="/admin/radar" className="group glass-panel-red p-8 rounded-2xl border border-red-500/30 hover:bg-red-900/40 transition-all hover:scale-105">
+                  <h2 className="text-2xl font-bold text-white uppercase">Outbreak Radar</h2>
+                </Link>
+              </>
+            )}
 
-          <Link href="/admin/queue" className="group glass-panel p-8 rounded-2xl border border-white/20 hover:border-blue-500 transition-all hover:scale-105">
-            <h2 className="text-2xl font-bold mb-2 text-white">S.H.I.E.L.D Queue</h2>
-            <p className="text-gray-400 text-sm">Admin Triage Approval</p>
-          </Link>
-          
-          <Link href="/doctor/dashboard" className="group glass-panel p-8 rounded-2xl border border-white/20 hover:border-blue-500 transition-all hover:scale-105">
-            <h2 className="text-2xl font-bold mb-2 text-white">Doctor Dashboard</h2>
-            <p className="text-gray-400 text-sm">Manage consultations</p>
-          </Link>
-          
-          <Link href="/doctor/schedule" className="group glass-panel p-8 rounded-2xl border border-white/20 hover:border-blue-500 transition-all hover:scale-105">
-            <h2 className="text-2xl font-bold mb-2 text-white">Doctor Schedule</h2>
-            <p className="text-gray-400 text-sm">Manage time slots</p>
-          </Link>
-        </div>
-
-        <Link href="/admin/radar" className="w-full max-w-2xl group glass-panel-red p-6 rounded-2xl border border-red-500/30 hover:bg-red-900/40 transition-all">
-          <h2 className="text-xl font-bold text-white uppercase tracking-widest">Global Outbreak Radar</h2>
-        </Link>
+            {(user.role === 'doctor' || user.role === 'hospital') && (
+              <>
+                <Link href="/doctor/dashboard" className="group glass-panel p-8 rounded-2xl border border-white/20 hover:border-blue-500 transition-all hover:scale-105">
+                  <h2 className="text-2xl font-bold mb-2 text-white">Doctor Dashboard</h2>
+                  <p className="text-gray-400 text-sm">Manage consultations</p>
+                </Link>
+                
+                <Link href="/doctor/schedule" className="group glass-panel p-8 rounded-2xl border border-white/20 hover:border-blue-500 transition-all hover:scale-105">
+                  <h2 className="text-2xl font-bold mb-2 text-white">Doctor Schedule</h2>
+                  <p className="text-gray-400 text-sm">Manage time slots</p>
+                </Link>
+              </>
+            )}
+          </div>
+        )}
       </main>
       
       <footer className="absolute bottom-8 z-10 text-gray-500 text-sm font-bold tracking-widest uppercase">

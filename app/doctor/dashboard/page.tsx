@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { collection, query, where, onSnapshot, doc, updateDoc, addDoc, serverTimestamp } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { useAuth } from "@/components/AuthProvider";
 
 export default function DoctorDashboardPage() {
   const [tickets, setTickets] = useState<any[]>([]);
@@ -12,9 +13,17 @@ export default function DoctorDashboardPage() {
   const [medicine, setMedicine] = useState("");
   const [isCompleting, setIsCompleting] = useState(false);
 
+  const { user } = useAuth();
+
   useEffect(() => {
-    // For demo purposes, we fetch all 'booked' tickets (Normally filtered by assigned_doc_uid)
-    const q = query(collection(db, "Tickets"), where("status", "==", "booked"));
+    if (!user?.uid) return;
+
+    // Fetch booked tickets assigned to THIS doctor
+    const q = query(
+      collection(db, "Tickets"), 
+      where("status", "==", "booked"),
+      where("assigned_doc_uid", "==", user.uid)
+    );
     
     const unsubscribe = onSnapshot(q, (querySnapshot) => {
       const ticketsData: any[] = [];

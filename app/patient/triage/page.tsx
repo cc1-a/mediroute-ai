@@ -2,9 +2,11 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useAuth } from "@/components/AuthProvider";
 
 export default function PatientTriagePage() {
   const router = useRouter();
+  const { user } = useAuth();
   
   const [symptoms, setSymptoms] = useState("");
   const [location, setLocation] = useState("");
@@ -16,6 +18,7 @@ export default function PatientTriagePage() {
   
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [isMild, setIsMild] = useState(false);
   const [error, setError] = useState("");
 
   const handleSubmit = async (e: React.FormEvent, skipFollowUp = false) => {
@@ -36,8 +39,8 @@ export default function PatientTriagePage() {
           symptoms: finalSymptoms, 
           location,
           skip_followup: skipFollowUp,
-          patient_uid: "patient_1",
-          patient_name: "Peter Parker"
+          patient_uid: user?.uid || "guest_uid",
+          patient_name: user?.name || "Guest"
         }),
       });
 
@@ -53,6 +56,7 @@ export default function PatientTriagePage() {
       } else {
         // Triage is finalized
         setSuccess(true);
+        setIsMild(data.isMild);
       }
     } catch (err: any) {
       setError(err.message || "An unexpected error occurred.");
@@ -72,8 +76,21 @@ export default function PatientTriagePage() {
 
         {success ? (
           <div className="glass-panel-red rounded-xl p-8 text-center animate-fade-in">
-            <h3 className="text-2xl font-bold mb-4">Ticket Submitted to S.H.I.E.L.D. HQ</h3>
-            <p className="text-gray-200 mb-6">Your symptoms have been logged. An Admin will review for emergencies before booking.</p>
+            {isMild ? (
+              <>
+                <h3 className="text-2xl font-bold mb-4 text-green-400">Mild Condition Detected</h3>
+                <p className="text-gray-200 mb-6">Our AI has evaluated your symptoms as non-critical. You have been cleared to directly book an appointment.</p>
+                <div className="bg-blue-900/30 border border-blue-500/30 p-4 rounded-xl mb-6 text-sm text-blue-200">
+                  💡 <strong>Recommendation:</strong> Consider choosing an <span className="text-white font-bold">Online Consultation</span> to save time and travel! Many freelance doctors on our network offer Google Meet appointments.
+                </div>
+              </>
+            ) : (
+              <>
+                <h3 className="text-2xl font-bold mb-4">Ticket Submitted to S.H.I.E.L.D. HQ</h3>
+                <p className="text-gray-200 mb-6">Your symptoms have been logged. An Admin will review for emergencies before booking.</p>
+              </>
+            )}
+            
             <button 
               onClick={() => router.push('/patient/booking')}
               className="px-8 py-3 bg-red-600 hover:bg-red-700 font-bold rounded-lg transition shadow-lg shadow-red-500/30"
@@ -142,10 +159,15 @@ export default function PatientTriagePage() {
                 className="w-full px-4 py-3 bg-[#0a192f] border border-white/10 rounded-xl focus:ring-2 focus:ring-red-500 outline-none transition text-white"
               >
                 <option value="" disabled>Select your zone</option>
-                <option value="Colombo 1">Colombo 1 (Fort)</option>
-                <option value="Colombo 3">Colombo 3 (Kollupitiya)</option>
-                <option value="Colombo 5">Colombo 5 (Havelock Town)</option>
-                <option value="Dehiwala">Dehiwala</option>
+                <option value="Colombo 1">Colombo 1</option>
+                <option value="Colombo 2">Colombo 2</option>
+                <option value="Colombo 3">Colombo 3</option>
+                <option value="Colombo 4">Colombo 4</option>
+                <option value="Colombo 5">Colombo 5</option>
+                <option value="Colombo 6">Colombo 6</option>
+                <option value="Colombo 7">Colombo 7</option>
+                <option value="Colombo 8">Colombo 8</option>
+                <option value="Colombo 9">Colombo 9</option>
               </select>
             </div>
 

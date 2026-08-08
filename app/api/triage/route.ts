@@ -80,7 +80,10 @@ Return ONLY a strict JSON object with these fields, with no markdown formatting.
       }
     }
 
-    // Triage is finalized. Save to Firestore for Admin Review Queue
+    const isMild = triageData.urgency_level <= 2;
+    const initialStatus = isMild ? "pending_booking" : "pending_admin";
+
+    // Triage is finalized. Save to Firestore
     const ticketsRef = collection(db, 'Tickets');
     const newTicket = {
       patient_uid: patient_uid || "guest_uid",
@@ -90,7 +93,7 @@ Return ONLY a strict JSON object with these fields, with no markdown formatting.
       urgency_level: triageData.urgency_level,
       required_specialty: triageData.required_specialty,
       location: location,
-      status: "pending_admin", // Admin MUST review it next!
+      status: initialStatus,
       timestamp: serverTimestamp(),
       assigned_doc_uid: null,
       emergency_flag: false
@@ -135,7 +138,8 @@ Return ONLY a strict JSON object with these fields, with no markdown formatting.
       success: true, 
       ticketId: docRef.id, 
       triage: triageData,
-      status: "pending_admin"
+      status: initialStatus,
+      isMild
     }, { status: 200 });
 
   } catch (error: any) {

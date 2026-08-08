@@ -4,16 +4,20 @@ import { useEffect, useState } from "react";
 import { db } from "@/lib/firebase";
 import { collection, query, where, getDocs, updateDoc, doc, onSnapshot } from "firebase/firestore";
 
+import { useAuth } from "@/components/AuthProvider";
+
 export default function PatientBookingPage() {
   const [tickets, setTickets] = useState<any[]>([]);
   const [selectedTicket, setSelectedTicket] = useState<any>(null);
   const [availableDocs, setAvailableDocs] = useState<any[]>([]);
+  const { user } = useAuth();
 
   // 1. Listen for patient's pending bookings
   useEffect(() => {
+    if (!user?.uid) return;
     const q = query(
       collection(db, "Tickets"),
-      where("patient_uid", "==", "patient_1"),
+      where("patient_uid", "==", user.uid),
       where("status", "==", "pending_booking")
     );
 
@@ -21,7 +25,7 @@ export default function PatientBookingPage() {
       setTickets(snapshot.docs.map(d => ({ id: d.id, ...d.data() })));
     });
     return () => unsubscribe();
-  }, []);
+  }, [user]);
 
   // 2. Fetch Doctors matching the selected ticket's specialty and location
   const handleSelectTicket = async (ticket: any) => {
@@ -49,7 +53,9 @@ export default function PatientBookingPage() {
           name: matchingUser.name,
           role: matchingUser.role,
           specialty: pData.specialty,
-          slots: pData.available_slots || []
+          slots: pData.available_slots || [],
+          isOnline: pData.isOnline || matchingUser.isOnline,
+          meetLink: pData.meetLink
         });
       }
     });
@@ -128,7 +134,16 @@ export default function PatientBookingPage() {
                         {doc.name.charAt(0)}
                       </div>
                       <div>
-                        <h3 className="text-xl font-bold">{doc.name} <span className="text-xs bg-white/10 px-2 py-1 rounded ml-2 text-gray-300">{doc.role.toUpperCase()}</span></h3>
+                        <h3 className="text-xl font-bold">
+                          {doc.name} 
+                          <span className="text-xs bg-white/10 px-2 py-1 rounded ml-2 text-gray-300">{doc.role.toUpperCase()}</span>
+                          {doc.isOnline && (
+                            <span className="text-xs bg-green-600/20 text-green-400 border border-green-500/50 px-2 py-1 rounded ml-2 font-bold flex items-center inline-flex gap-1">
+                              <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
+                              ONLINE CONSULTATION
+                            </span>
+                          )}
+                        </h3>
                         <p className="text-blue-400 text-sm">{doc.specialty}</p>
                       </div>
                     </div>

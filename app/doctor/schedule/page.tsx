@@ -3,17 +3,19 @@
 import { useEffect, useState } from "react";
 import { db } from "@/lib/firebase";
 import { doc, getDoc, updateDoc } from "firebase/firestore";
+import { useAuth } from "@/components/AuthProvider";
 
 export default function DoctorSchedulePage() {
   const [profile, setProfile] = useState<any>(null);
   const [time, setTime] = useState("");
   const [duration, setDuration] = useState("15");
   const [lineName, setLineName] = useState("");
-
-  // Hardcoded for demo to Dr. Strange (doc_freelance_1)
-  const doctorUid = "doc_freelance_1";
+  
+  const { user } = useAuth();
+  const doctorUid = user?.uid;
 
   useEffect(() => {
+    if (!doctorUid) return;
     const fetchProfile = async () => {
       const pDoc = await getDoc(doc(db, "DoctorProfiles", doctorUid));
       if (pDoc.exists()) {
