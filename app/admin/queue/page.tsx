@@ -17,7 +17,7 @@ export default function AdminQueuePage() {
       const fetchedTickets = snapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
-      }));
+      } as any));
       // Sort by urgency locally (since Firestore needs a composite index to sort by urgency while querying status)
       fetchedTickets.sort((a, b) => b.urgency_level - a.urgency_level);
       setTickets(fetchedTickets);
