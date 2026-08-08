@@ -86,12 +86,12 @@ export default function PatientBookingPage() {
   return (
     <div className="min-h-screen p-8 text-white">
       <div className="max-w-6xl mx-auto">
-        <h1 className="text-3xl font-black mb-8 text-white">Spider-Web Booking Portal</h1>
+        <h1 className="text-3xl font-black mb-8 text-white">Booking Portal</h1>
         
         {tickets.length === 0 && !selectedTicket && (
           <div className="glass-panel p-12 text-center rounded-2xl">
             <h2 className="text-xl font-bold text-gray-400">No Pending Bookings</h2>
-            <p className="text-gray-500">Wait for S.H.I.E.L.D Admin to review your triage tickets.</p>
+            <p className="text-gray-500">Your triage tickets will appear here once approved by the admin.</p>
           </div>
         )}
 

@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useState, useEffect } from "react";
 import { useRouter, usePathname } from "next/navigation";
+import Link from "next/link";
 
 type UserContextType = {
   user: any;
@@ -18,7 +19,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
 
   useEffect(() => {
-    const stored = localStorage.getItem("spider_user");
+    const stored = localStorage.getItem("mediroute_user");
     if (stored) {
       setUser(JSON.parse(stored));
     }
@@ -26,47 +27,66 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const login = (userData: any) => {
-    localStorage.setItem("spider_user", JSON.stringify(userData));
+    localStorage.setItem("mediroute_user", JSON.stringify(userData));
     setUser(userData);
-    router.push("/");
+    // Role-based redirect after login
+    if (userData.role === 'patient') router.push('/patient/dashboard');
+    else if (userData.role === 'admin') router.push('/admin/queue');
+    else if (userData.role === 'doctor' || userData.role === 'hospital') router.push('/doctor/dashboard');
+    else router.push('/');
   };
 
   const logout = () => {
-    localStorage.removeItem("spider_user");
+    localStorage.removeItem("mediroute_user");
     setUser(null);
     router.push("/login");
   };
 
   if (!isLoaded) return null;
 
+  const isLoginPage = pathname === "/login";
+
   return (
     <AuthContext.Provider value={{ user, login, logout }}>
       <div className="flex flex-col min-h-screen">
-        {user && pathname !== "/login" && (
-          <nav className="w-full max-w-6xl mx-auto p-6 flex justify-between items-center z-50">
-            <div className="flex items-center gap-8">
-              <span className="font-black text-2xl text-white tracking-tighter cursor-pointer" onClick={() => router.push('/')}>
-                <span style={{ color: 'var(--spidey-red)' }}>WEB</span>ROUTE
-              </span>
-              
-              <div className="hidden md:flex gap-6 text-sm font-bold tracking-wider uppercase text-gray-300">
-                <a href="/" className="hover:text-white hover:border-b-2 border-red-600 pb-1 transition-all">Home</a>
-                <a href="/" className="hover:text-white hover:border-b-2 border-red-600 pb-1 transition-all">About us</a>
-                {user.role === 'patient' && (
-                  <a href="/patient/triage" className="hover:text-white hover:border-b-2 border-red-600 pb-1 transition-all">Triage</a>
-                )}
-                {user.role === 'admin' && (
-                  <a href="/admin/queue" className="hover:text-white hover:border-b-2 border-red-600 pb-1 transition-all">Queue</a>
-                )}
-                {(user.role === 'doctor' || user.role === 'hospital') && (
-                  <a href="/doctor/dashboard" className="hover:text-white hover:border-b-2 border-red-600 pb-1 transition-all">Dashboard</a>
-                )}
-              </div>
+        {user && !isLoginPage && (
+          <nav className="w-full border-b border-white/10 bg-black/80 backdrop-blur-sm px-6 py-4 flex items-center justify-between sticky top-0 z-50">
+            <Link href="/" className="font-black text-xl tracking-tighter text-white">
+              MEDI<span className="text-red-600">ROUTE</span>
+            </Link>
+
+            <div className="flex items-center gap-6 text-sm font-bold">
+              {user.role === 'patient' && (
+                <>
+                  <Link href="/patient/dashboard" className="text-gray-400 hover:text-white transition">Dashboard</Link>
+                </>
+              )}
+              {user.role === 'admin' && (
+                <>
+                  <Link href="/admin/queue" className="text-gray-400 hover:text-white transition">Review Queue</Link>
+                  <Link href="/admin/radar" className="text-gray-400 hover:text-white transition">Outbreak Radar</Link>
+                </>
+              )}
+              {(user.role === 'doctor' || user.role === 'hospital') && (
+                <>
+                  <Link href="/doctor/dashboard" className="text-gray-400 hover:text-white transition">
+                    {user.role === 'hospital' ? 'Hospital Dashboard' : 'My Dashboard'}
+                  </Link>
+                  <Link href="/doctor/schedule" className="text-gray-400 hover:text-white transition">Schedule</Link>
+                </>
+              )}
             </div>
-            
-            <div className="flex gap-4 items-center">
-              <span className="text-gray-400 text-xs font-bold uppercase tracking-widest"><strong className="text-white">{user.name}</strong></span>
-              <button onClick={logout} className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-full transition text-xs font-bold uppercase tracking-wider shadow-lg shadow-red-500/30">LOGOUT</button>
+
+            <div className="flex items-center gap-4">
+              <span className="text-xs font-bold text-gray-600 uppercase tracking-wider hidden sm:block">
+                {user.name}
+              </span>
+              <button
+                onClick={logout}
+                className="px-4 py-2 border border-white/20 hover:border-white/50 hover:bg-white/10 text-white rounded-xl transition text-xs font-bold uppercase tracking-wider"
+              >
+                Logout
+              </button>
             </div>
           </nav>
         )}

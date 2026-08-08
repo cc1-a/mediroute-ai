@@ -70,7 +70,7 @@ export default function PatientTriagePage() {
       <div className="w-full max-w-2xl glass-panel rounded-2xl shadow-2xl p-8 border border-white/20">
         
         <div className="mb-8 text-center">
-          <h1 className="text-4xl font-black mb-2 tracking-tight" style={{ color: 'var(--spidey-red)' }}>WEB TRIAGE</h1>
+          <h1 className="text-4xl font-black mb-2 tracking-tight" style={{ color: 'var(--spidey-red)' }}>AI Triage</h1>
           <p className="text-gray-300 font-medium">Smart Symptom Analysis</p>
         </div>
 
@@ -86,16 +86,16 @@ export default function PatientTriagePage() {
               </>
             ) : (
               <>
-                <h3 className="text-2xl font-bold mb-4">Ticket Submitted to S.H.I.E.L.D. HQ</h3>
-                <p className="text-gray-200 mb-6">Your symptoms have been logged. An Admin will review for emergencies before booking.</p>
+                <h3 className="text-2xl font-bold mb-4">Case Submitted for Admin Review</h3>
+                <p className="text-gray-200 mb-6">Your symptoms have been logged and will be reviewed by an admin before booking.</p>
               </>
             )}
             
             <button 
-              onClick={() => router.push('/patient/booking')}
+              onClick={() => router.push('/patient/dashboard')}
               className="px-8 py-3 bg-red-600 hover:bg-red-700 font-bold rounded-lg transition shadow-lg shadow-red-500/30"
             >
-              Go to Booking Portal
+              Find a Doctor
             </button>
           </div>
         ) : needsClarification ? (

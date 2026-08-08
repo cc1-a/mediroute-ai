@@ -8,47 +8,31 @@ import { useAuth } from "@/components/AuthProvider";
 export default function DoctorDashboardPage() {
   const [tickets, setTickets] = useState<any[]>([]);
   const [activeConsultation, setActiveConsultation] = useState<any>(null);
-  
   const [diagnosis, setDiagnosis] = useState("");
   const [medicine, setMedicine] = useState("");
   const [isCompleting, setIsCompleting] = useState(false);
-
   const { user } = useAuth();
 
   useEffect(() => {
     if (!user?.uid) return;
-
-    // Fetch booked tickets assigned to THIS doctor
     const q = query(
-      collection(db, "Tickets"), 
+      collection(db, "Tickets"),
       where("status", "==", "booked"),
       where("assigned_doc_uid", "==", user.uid)
     );
-    
-    const unsubscribe = onSnapshot(q, (querySnapshot) => {
-      const ticketsData: any[] = [];
-      querySnapshot.forEach((d) => {
-        ticketsData.push({ id: d.id, ...d.data() });
-      });
-      // Sort by urgency descending
-      ticketsData.sort((a, b) => b.urgency_level - a.urgency_level);
-      setTickets(ticketsData);
+    const unsubscribe = onSnapshot(q, (snap) => {
+      const data = snap.docs.map(d => ({ id: d.id, ...d.data() })) as any[];
+      data.sort((a, b) => b.urgency_level - a.urgency_level);
+      setTickets(data);
     });
-
     return () => unsubscribe();
-  }, []);
+  }, [user]);
 
   const handleComplete = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsCompleting(true);
-    
     try {
-      // 1. Mark ticket completed
-      await updateDoc(doc(db, "Tickets", activeConsultation.id), {
-        status: "completed"
-      });
-
-      // 2. Add to MedicalLogs
+      await updateDoc(doc(db, "Tickets", activeConsultation.id), { status: "completed" });
       await addDoc(collection(db, "MedicalLogs"), {
         ticket_id: activeConsultation.id,
         patient_uid: activeConsultation.patient_uid,
@@ -56,125 +40,129 @@ export default function DoctorDashboardPage() {
         final_diagnosis: diagnosis,
         medicine: medicine,
         location: activeConsultation.location,
-        timestamp: serverTimestamp()
+        timestamp: serverTimestamp(),
       });
-
       setActiveConsultation(null);
       setDiagnosis("");
       setMedicine("");
-      alert("Consultation Complete! Saved to Medical Logs.");
-    } catch (err) {
-      alert("Failed to complete consultation");
+      alert("Consultation saved to patient's medical records.");
+    } catch {
+      alert("Failed to complete consultation.");
     } finally {
       setIsCompleting(false);
     }
   };
 
+  const dashboardTitle = user?.role === 'hospital' ? 'Hospital Dashboard' : 'Doctor Dashboard';
+
   return (
-    <div className="min-h-screen p-8 text-white flex gap-8">
-      
-      {/* Sidebar: Queue */}
-      <div className="w-1/3 glass-panel p-6 rounded-2xl flex flex-col border border-blue-500/30">
-        <h1 className="text-2xl font-black mb-6" style={{ color: 'var(--spidey-red)' }}>Spider-Web Clinic</h1>
-        <h2 className="text-gray-400 font-bold mb-4 uppercase text-sm tracking-wider">Booked Appointments</h2>
-        
-        <div className="overflow-y-auto space-y-4 flex-grow pr-2">
+    <div className="min-h-screen bg-black text-white flex gap-0">
+
+      {/* Sidebar */}
+      <div className="w-80 border-r border-white/10 flex flex-col min-h-screen">
+        <div className="p-6 border-b border-white/10">
+          <h1 className="text-2xl font-black tracking-tight">{dashboardTitle}</h1>
+          <p className="text-gray-500 text-sm mt-1">{user?.name}</p>
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-4">
+          <p className="text-xs font-bold text-gray-600 uppercase tracking-wider mb-4 px-2">Today's Appointments ({tickets.length})</p>
+
           {tickets.length === 0 && (
-            <p className="text-gray-500 text-center py-8">No booked appointments right now.</p>
+            <div className="text-center py-12 text-gray-600 text-sm">No appointments today.</div>
           )}
-          {tickets.map((ticket) => (
-            <div 
-              key={ticket.id} 
-              onClick={() => {
-                setActiveConsultation(ticket);
-                setDiagnosis("");
-                setMedicine("");
-              }}
-              className={`p-4 rounded-xl border cursor-pointer transition ${activeConsultation?.id === ticket.id ? 'bg-blue-900/50 border-blue-400 shadow-[0_0_15px_rgba(4,82,180,0.5)]' : 'glass-panel border-white/10 hover:border-blue-500/50'}`}
+
+          {tickets.map(ticket => (
+            <button
+              key={ticket.id}
+              onClick={() => { setActiveConsultation(ticket); setDiagnosis(""); setMedicine(""); }}
+              className={`w-full text-left p-4 rounded-xl mb-2 transition ${
+                activeConsultation?.id === ticket.id
+                  ? 'bg-red-600/20 border border-red-500/50'
+                  : 'bg-white/5 border border-white/10 hover:bg-white/10'
+              }`}
             >
-              <div className="flex justify-between items-start mb-2">
-                <h3 className="font-bold">{ticket.patient_name}</h3>
-                <span className="text-xs bg-red-600 px-2 py-1 rounded font-bold">{ticket.appointment_time}</span>
+              <div className="flex justify-between items-start">
+                <span className="font-bold text-sm text-white">{ticket.patient_name}</span>
+                <span className={`text-xs px-2 py-0.5 rounded-full font-bold ${
+                  ticket.urgency_level >= 4 ? 'bg-red-900/50 text-red-400' : 'bg-white/10 text-gray-400'
+                }`}>Lvl {ticket.urgency_level}</span>
               </div>
-              <p className="text-xs text-gray-400 line-clamp-1">{ticket.core_symptoms}</p>
-            </div>
+              <p className="text-xs text-gray-500 mt-1 truncate">{ticket.core_symptoms}</p>
+              <p className="text-xs text-gray-600 mt-1">{ticket.appointment_time}</p>
+            </button>
           ))}
         </div>
       </div>
 
-      {/* Main Panel: Consultation */}
-      <div className="w-2/3 glass-panel p-8 rounded-2xl border border-white/10">
+      {/* Main panel */}
+      <div className="flex-1 p-8">
         {!activeConsultation ? (
-          <div className="h-full flex flex-col items-center justify-center text-gray-500">
-            <svg className="w-24 h-24 mb-4 opacity-20" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm-1-13h2v6h-2zm0 8h2v2h-2z"/></svg>
-            <h2 className="text-2xl font-bold mb-2">Ready for Patients</h2>
-            <p>Select an appointment from the queue to start consultation.</p>
+          <div className="h-full flex flex-col items-center justify-center text-gray-700">
+            <div className="text-6xl mb-4">🩺</div>
+            <h2 className="text-2xl font-black text-gray-500">Select a Patient</h2>
+            <p className="text-gray-600 mt-2 text-sm">Click an appointment from the queue to begin.</p>
           </div>
         ) : (
-          <div className="animate-fade-in flex flex-col h-full">
-            <div className="flex justify-between items-start mb-6 pb-6 border-b border-white/10">
-              <div>
-                <h2 className="text-3xl font-black text-white mb-2">{activeConsultation.patient_name}</h2>
-                <div className="flex gap-3 text-sm font-bold">
-                  <span className="text-red-400 uppercase tracking-wider">Level {activeConsultation.urgency_level}</span>
-                  <span className="text-gray-500">•</span>
-                  <span className="text-blue-400 uppercase tracking-wider">{activeConsultation.location}</span>
-                </div>
+          <div className="max-w-2xl">
+            <div className="mb-8">
+              <div className="flex items-center gap-3 mb-2">
+                <h2 className="text-4xl font-black">{activeConsultation.patient_name}</h2>
+                {activeConsultation.emergency_flag && (
+                  <span className="px-3 py-1 bg-red-600 text-white text-xs font-black rounded-full animate-pulse">EMERGENCY</span>
+                )}
               </div>
-              {activeConsultation.emergency_flag && (
-                <span className="bg-red-600 text-white px-4 py-2 text-sm font-bold rounded shadow-lg shadow-red-500/50 animate-pulse">
-                  EMERGENCY FLAGGED
-                </span>
+              <div className="flex gap-4 text-sm text-gray-500">
+                <span>Urgency: <span className="text-white font-bold">Level {activeConsultation.urgency_level}</span></span>
+                <span>·</span>
+                <span>Zone: <span className="text-white font-bold">{activeConsultation.location}</span></span>
+                <span>·</span>
+                <span>Time: <span className="text-white font-bold">{activeConsultation.appointment_time}</span></span>
+              </div>
+            </div>
+
+            <div className="mb-6 p-5 rounded-2xl bg-white/5 border border-white/10">
+              <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Patient Symptoms</p>
+              <p className="text-white">{activeConsultation.core_symptoms}</p>
+              {activeConsultation.raw_symptoms !== activeConsultation.core_symptoms && (
+                <p className="text-gray-600 text-sm mt-2 italic">Raw: "{activeConsultation.raw_symptoms}"</p>
               )}
             </div>
 
-            <div className="mb-8">
-              <h3 className="text-gray-400 font-bold mb-2 text-sm uppercase">Patient Symptoms (AI Parsed)</h3>
-              <p className="bg-white/5 p-4 rounded-xl border border-white/5">{activeConsultation.core_symptoms}</p>
-            </div>
-            <div className="mb-8">
-              <h3 className="text-gray-400 font-bold mb-2 text-sm uppercase">Raw Input</h3>
-              <p className="text-gray-400 italic text-sm">{activeConsultation.raw_symptoms}</p>
-            </div>
-
-            <form onSubmit={handleComplete} className="mt-auto space-y-6">
-              <div className="grid grid-cols-2 gap-6">
-                <div>
-                  <label className="block text-blue-300 font-bold mb-2 text-sm uppercase">Diagnosis</label>
-                  <textarea 
-                    required
-                    value={diagnosis}
-                    onChange={(e) => setDiagnosis(e.target.value)}
-                    rows={4}
-                    className="w-full bg-white/5 border border-white/10 rounded-xl p-4 text-white focus:ring-2 focus:ring-blue-500 outline-none transition placeholder-gray-600"
-                    placeholder="Enter final diagnosis..."
-                  />
-                </div>
-                <div>
-                  <label className="block text-blue-300 font-bold mb-2 text-sm uppercase">Prescribed Medicine</label>
-                  <textarea 
-                    required
-                    value={medicine}
-                    onChange={(e) => setMedicine(e.target.value)}
-                    rows={4}
-                    className="w-full bg-white/5 border border-white/10 rounded-xl p-4 text-white focus:ring-2 focus:ring-blue-500 outline-none transition placeholder-gray-600"
-                    placeholder="Enter medicine and dosage..."
-                  />
-                </div>
+            <form onSubmit={handleComplete} className="space-y-5">
+              <div>
+                <label className="block text-sm font-bold text-gray-400 mb-2 uppercase tracking-wider">Diagnosis</label>
+                <textarea
+                  required
+                  value={diagnosis}
+                  onChange={e => setDiagnosis(e.target.value)}
+                  rows={3}
+                  className="w-full bg-white/5 border border-white/10 rounded-2xl p-4 text-white focus:ring-2 focus:ring-red-500 outline-none transition placeholder-gray-600 resize-none"
+                  placeholder="Enter your diagnosis..."
+                />
               </div>
-
-              <button 
+              <div>
+                <label className="block text-sm font-bold text-gray-400 mb-2 uppercase tracking-wider">Prescribed Medicine</label>
+                <textarea
+                  required
+                  value={medicine}
+                  onChange={e => setMedicine(e.target.value)}
+                  rows={3}
+                  className="w-full bg-white/5 border border-white/10 rounded-2xl p-4 text-white focus:ring-2 focus:ring-red-500 outline-none transition placeholder-gray-600 resize-none"
+                  placeholder="Enter medicine and dosage..."
+                />
+              </div>
+              <button
                 type="submit"
                 disabled={isCompleting}
-                className="w-full py-4 bg-blue-600 hover:bg-blue-700 font-black text-lg rounded-xl shadow-lg shadow-blue-500/30 transition disabled:opacity-50"
+                className="w-full py-4 bg-red-600 hover:bg-red-500 font-black text-lg rounded-2xl transition disabled:opacity-50 shadow-lg shadow-red-900/30"
               >
-                {isCompleting ? "Saving Log..." : "Complete Consultation & Save Log"}
+                {isCompleting ? "Saving..." : "Complete Consultation & Save to Records"}
               </button>
             </form>
           </div>
         )}
       </div>
-      
     </div>
   );
 }

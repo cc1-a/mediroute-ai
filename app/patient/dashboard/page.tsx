@@ -1,0 +1,448 @@
+"use client";
+
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { useAuth } from "@/components/AuthProvider";
+import { db } from "@/lib/firebase";
+import { collection, query, where, getDocs, onSnapshot, updateDoc, doc } from "firebase/firestore";
+
+type Step = "dashboard" | "symptoms" | "followup" | "results" | "records";
+
+export default function PatientDashboard() {
+  const { user } = useAuth();
+  const router = useRouter();
+  const [step, setStep] = useState<Step>("dashboard");
+
+  // Symptom form
+  const [symptoms, setSymptoms] = useState("");
+  const [location, setLocation] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState("");
+
+  // Follow-up
+  const [questions, setQuestions] = useState<string[]>([]);
+  const [answers, setAnswers] = useState("");
+
+  // Results
+  const [triage, setTriage] = useState<any>(null);
+  const [ticketId, setTicketId] = useState<string>("");
+  const [isMild, setIsMild] = useState(false);
+  const [doctors, setDoctors] = useState<any[]>([]);
+  const [loadingDoctors, setLoadingDoctors] = useState(false);
+  const [bookingSlot, setBookingSlot] = useState<string>("");
+  const [booked, setBooked] = useState(false);
+
+  // Previous records
+  const [records, setRecords] = useState<any[]>([]);
+  const [loadingRecords, setLoadingRecords] = useState(false);
+
+  useEffect(() => {
+    if (!user) router.push('/login');
+  }, [user, router]);
+
+  const fetchDoctors = async (triageResult: any, loc: string) => {
+    setLoadingDoctors(true);
+    try {
+      // First try matching by location
+      const usersQ = query(collection(db, "Users"), where("location", "==", loc));
+      const usersSnap = await getDocs(usersQ);
+      const validUsers = usersSnap.docs
+        .map(d => ({ uid: d.id, ...(d.data() as any) }))
+        .filter(u => u.role === 'doctor' || u.role === 'hospital');
+
+      // Then get their profiles
+      const profilesSnap = await getDocs(collection(db, "DoctorProfiles"));
+      const found: any[] = [];
+
+      profilesSnap.docs.forEach(p => {
+        const pData = p.data() as any;
+        const matchingUser = validUsers.find(u => u.uid === p.id);
+        if (matchingUser) {
+          found.push({
+            uid: p.id,
+            name: matchingUser.name,
+            role: matchingUser.role,
+            specialty: pData.specialty,
+            slots: (pData.available_slots || []).filter((s: any) => !s.booked),
+            isOnline: pData.isOnline || matchingUser.isOnline,
+            meetLink: pData.meetLink,
+          });
+        }
+      });
+
+      // If no matching in zone, show all doctors
+      if (found.length === 0) {
+        profilesSnap.docs.forEach(p => {
+          const pData = p.data() as any;
+          found.push({
+            uid: p.id,
+            name: pData.name || p.id,
+            specialty: pData.specialty,
+            slots: (pData.available_slots || []).filter((s: any) => !s.booked),
+            isOnline: pData.isOnline,
+            meetLink: pData.meetLink,
+          });
+        });
+      }
+
+      setDoctors(found);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoadingDoctors(false);
+    }
+  };
+
+  const handleSubmitSymptoms = async (skipFollowup = false) => {
+    setIsSubmitting(true);
+    setError("");
+
+    const finalSymptoms = questions.length > 0 && !skipFollowup
+      ? `Original: ${symptoms}\nFollow-up Answers: ${answers}`
+      : symptoms;
+
+    try {
+      const res = await fetch("/api/triage", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          symptoms: finalSymptoms,
+          location,
+          skip_followup: skipFollowup,
+          patient_uid: user?.uid || "guest",
+          patient_name: user?.name || "Patient",
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Triage failed");
+
+      if (data.needs_clarification) {
+        setQuestions(data.questions || []);
+        setStep("followup");
+      } else {
+        setTriage(data.triage);
+        setTicketId(data.ticketId);
+        setIsMild(data.isMild);
+        await fetchDoctors(data.triage, location);
+        setStep("results");
+      }
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleBook = async (docUid: string, time: string) => {
+    if (!ticketId) return;
+    try {
+      await updateDoc(doc(db, "Tickets", ticketId), {
+        status: "booked",
+        assigned_doc_uid: docUid,
+        appointment_time: time,
+      });
+      setBookingSlot(time);
+      setBooked(true);
+    } catch (e) {
+      alert("Booking failed.");
+    }
+  };
+
+  const fetchRecords = async () => {
+    if (!user?.uid) return;
+    setLoadingRecords(true);
+    setStep("records");
+    try {
+      const q = query(collection(db, "MedicalLogs"), where("patient_uid", "==", user.uid));
+      const snap = await getDocs(q);
+      setRecords(snap.docs.map(d => ({ id: d.id, ...(d.data() as any) })));
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoadingRecords(false);
+    }
+  };
+
+  if (!user) return null;
+
+  return (
+    <div className="min-h-screen bg-black text-white">
+      <div className="max-w-4xl mx-auto px-6 py-12">
+
+        {/* ── DASHBOARD HOME ── */}
+        {step === "dashboard" && (
+          <div>
+            <div className="mb-10">
+              <p className="text-gray-500 text-sm font-bold uppercase tracking-widest mb-2">Welcome back</p>
+              <h1 className="text-5xl font-black tracking-tight">
+                {user.name?.split(" ")[0]}<span className="text-red-600">.</span>
+              </h1>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+              <button
+                onClick={() => setStep("symptoms")}
+                className="group p-8 rounded-3xl bg-red-600 hover:bg-red-500 text-left transition-all shadow-xl shadow-red-900/30 hover:scale-[1.02]"
+              >
+                <div className="text-4xl mb-4">🔍</div>
+                <h2 className="text-2xl font-black mb-2">Find a Doctor</h2>
+                <p className="text-red-200 text-sm">Describe your symptoms and get AI-matched to the right specialist.</p>
+                <div className="mt-6 text-white font-bold text-sm group-hover:translate-x-1 transition-transform">
+                  Start Now →
+                </div>
+              </button>
+
+              <button
+                onClick={fetchRecords}
+                className="group p-8 rounded-3xl bg-white/5 border border-white/10 hover:bg-white/10 text-left transition-all hover:scale-[1.02]"
+              >
+                <div className="text-4xl mb-4">📋</div>
+                <h2 className="text-2xl font-black mb-2">My Medical Records</h2>
+                <p className="text-gray-400 text-sm">View your previous consultations, diagnoses, and prescriptions.</p>
+                <div className="mt-6 text-gray-400 font-bold text-sm group-hover:text-white group-hover:translate-x-1 transition-all">
+                  View Records →
+                </div>
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* ── SYMPTOM FORM ── */}
+        {step === "symptoms" && (
+          <div>
+            <button onClick={() => setStep("dashboard")} className="text-gray-500 hover:text-white text-sm font-bold mb-8 flex items-center gap-2 transition">
+              ← Back
+            </button>
+            <h2 className="text-4xl font-black mb-2">Tell us how you feel</h2>
+            <p className="text-gray-400 mb-8">Our AI will analyse your symptoms and recommend the right specialist.</p>
+
+            <div className="space-y-6">
+              <div>
+                <label className="block text-sm font-bold text-gray-400 mb-2">Describe your symptoms</label>
+                <textarea
+                  value={symptoms}
+                  onChange={e => setSymptoms(e.target.value)}
+                  rows={5}
+                  className="w-full px-5 py-4 bg-white/5 border border-white/10 rounded-2xl focus:ring-2 focus:ring-red-500 outline-none transition text-white placeholder-gray-600 resize-none"
+                  placeholder="E.g. I have been having a sharp chest pain for 2 days, especially when breathing..."
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-bold text-gray-400 mb-2">Your zone (Colombo)</label>
+                <select
+                  value={location}
+                  onChange={e => setLocation(e.target.value)}
+                  className="w-full px-5 py-4 bg-black border border-white/10 rounded-2xl focus:ring-2 focus:ring-red-500 outline-none transition text-white"
+                >
+                  <option value="" disabled>Select your zone</option>
+                  {[1,2,3,4,5,6,7,8,9].map(n => (
+                    <option key={n} value={`Colombo ${n}`}>Colombo {n}</option>
+                  ))}
+                </select>
+              </div>
+
+              {error && (
+                <div className="p-4 bg-red-900/30 border border-red-500/40 text-red-300 rounded-xl text-sm">{error}</div>
+              )}
+
+              <button
+                disabled={!symptoms || !location || isSubmitting}
+                onClick={() => handleSubmitSymptoms(false)}
+                className="w-full py-5 bg-red-600 hover:bg-red-500 font-black text-lg rounded-2xl transition disabled:opacity-40 shadow-lg shadow-red-900/30"
+              >
+                {isSubmitting ? "Analysing symptoms..." : "Find Available Doctors"}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* ── FOLLOW-UP QUESTIONS ── */}
+        {step === "followup" && (
+          <div>
+            <h2 className="text-4xl font-black mb-2">A few more questions</h2>
+            <p className="text-gray-400 mb-8">Our AI needs a bit more information to accurately match you.</p>
+
+            <div className="p-6 bg-white/5 border border-white/10 rounded-2xl mb-6">
+              <p className="text-sm font-bold text-gray-400 mb-4 uppercase tracking-wider">AI asks:</p>
+              <ul className="space-y-3">
+                {questions.map((q, i) => (
+                  <li key={i} className="flex gap-3 text-white">
+                    <span className="text-red-500 font-black">{i + 1}.</span>
+                    {q}
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            <textarea
+              value={answers}
+              onChange={e => setAnswers(e.target.value)}
+              rows={4}
+              className="w-full px-5 py-4 bg-white/5 border border-white/10 rounded-2xl focus:ring-2 focus:ring-red-500 outline-none transition text-white placeholder-gray-600 resize-none mb-4"
+              placeholder="Type your answers here..."
+            />
+
+            <div className="flex gap-4">
+              <button
+                disabled={!answers || isSubmitting}
+                onClick={() => handleSubmitSymptoms(false)}
+                className="flex-1 py-4 bg-red-600 hover:bg-red-500 font-black rounded-2xl transition disabled:opacity-40"
+              >
+                {isSubmitting ? "Analysing..." : "Submit Answers"}
+              </button>
+              <button
+                disabled={isSubmitting}
+                onClick={() => handleSubmitSymptoms(true)}
+                className="px-6 py-4 bg-white/10 hover:bg-white/20 font-bold rounded-2xl transition disabled:opacity-40 text-sm"
+              >
+                Skip
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* ── DOCTOR RESULTS ── */}
+        {step === "results" && (
+          <div>
+            {booked ? (
+              <div className="text-center py-16">
+                <div className="text-6xl mb-6">✅</div>
+                <h2 className="text-3xl font-black mb-3">Appointment Booked!</h2>
+                <p className="text-gray-400 mb-8">Your appointment is confirmed for <span className="text-white font-bold">{bookingSlot}</span>.</p>
+                <button
+                  onClick={() => { setStep("dashboard"); setBooked(false); setSymptoms(""); setAnswers(""); setDoctors([]); }}
+                  className="px-8 py-4 bg-white text-black font-black rounded-2xl hover:bg-gray-200 transition"
+                >
+                  Back to Dashboard
+                </button>
+              </div>
+            ) : (
+              <>
+                <button onClick={() => setStep("symptoms")} className="text-gray-500 hover:text-white text-sm font-bold mb-8 flex items-center gap-2 transition">
+                  ← Back
+                </button>
+
+                {isMild ? (
+                  <div className="mb-6 p-4 bg-green-900/20 border border-green-500/30 rounded-2xl text-green-300 text-sm font-medium">
+                    ✅ Good news — your symptoms are non-critical. You can book directly!
+                  </div>
+                ) : (
+                  <div className="mb-6 p-4 bg-yellow-900/20 border border-yellow-500/30 rounded-2xl text-yellow-300 text-sm font-medium">
+                    ⚠️ Your case has been flagged for admin review. You may still book directly while it's being reviewed.
+                  </div>
+                )}
+
+                <h2 className="text-4xl font-black mb-2">Available Doctors</h2>
+                <p className="text-gray-400 mb-8">Select a doctor and pick an available time slot.</p>
+
+                {loadingDoctors ? (
+                  <div className="text-center py-16 text-gray-500">Finding available doctors...</div>
+                ) : doctors.length === 0 ? (
+                  <div className="text-center py-16 text-gray-500">
+                    No doctors currently available in your zone. Please try again later.
+                  </div>
+                ) : (
+                  <div className="space-y-5">
+                    {doctors.map(d => (
+                      <div key={d.uid} className="p-6 rounded-2xl border border-white/10 bg-white/5">
+                        <div className="flex items-start justify-between mb-5">
+                          <div className="flex items-center gap-4">
+                            <div className="w-12 h-12 rounded-full bg-red-600 flex items-center justify-center font-black text-xl">
+                              {(d.name || "D").charAt(0)}
+                            </div>
+                            <div>
+                              <h3 className="font-black text-lg text-white">{d.name}</h3>
+                              <p className="text-gray-400 text-sm">{d.specialty}</p>
+                            </div>
+                          </div>
+                          <div className="flex gap-2 flex-wrap justify-end">
+                            {d.role && (
+                              <span className="px-2 py-1 bg-white/10 text-gray-300 text-xs font-bold rounded-full uppercase">
+                                {d.role}
+                              </span>
+                            )}
+                            {d.isOnline && (
+                              <span className="px-2 py-1 bg-green-900/30 text-green-400 border border-green-500/30 text-xs font-bold rounded-full flex items-center gap-1">
+                                <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
+                                Online Consultation
+                              </span>
+                            )}
+                          </div>
+                        </div>
+
+                        {d.slots.length === 0 ? (
+                          <p className="text-gray-600 text-sm">No available slots at the moment.</p>
+                        ) : (
+                          <div>
+                            <p className="text-xs text-gray-500 font-bold uppercase tracking-wider mb-3">Available Slots</p>
+                            <div className="flex flex-wrap gap-3">
+                              {d.slots.map((slot: any, i: number) => (
+                                <button
+                                  key={i}
+                                  onClick={() => handleBook(d.uid, slot.time)}
+                                  className="px-4 py-2 bg-white text-black font-bold rounded-xl hover:bg-red-500 hover:text-white transition text-sm"
+                                >
+                                  {slot.time}
+                                  {slot.duration_mins && <span className="ml-1 text-xs opacity-70">({slot.duration_mins}m)</span>}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        )}
+
+        {/* ── PREVIOUS RECORDS ── */}
+        {step === "records" && (
+          <div>
+            <button onClick={() => setStep("dashboard")} className="text-gray-500 hover:text-white text-sm font-bold mb-8 flex items-center gap-2 transition">
+              ← Back
+            </button>
+            <h2 className="text-4xl font-black mb-2">Medical Records</h2>
+            <p className="text-gray-400 mb-8">Your past consultations and diagnoses.</p>
+
+            {loadingRecords ? (
+              <div className="text-center py-16 text-gray-500">Loading records...</div>
+            ) : records.length === 0 ? (
+              <div className="text-center py-16">
+                <div className="text-5xl mb-4">📭</div>
+                <p className="text-gray-500">No medical records yet. Your history will appear here after consultations.</p>
+              </div>
+            ) : (
+              <div className="space-y-5">
+                {records.map(r => (
+                  <div key={r.id} className="p-6 rounded-2xl border border-white/10 bg-white/5">
+                    <div className="flex justify-between items-start mb-4">
+                      <div>
+                        <h3 className="font-bold text-lg text-white">{r.final_diagnosis}</h3>
+                        <p className="text-gray-500 text-sm">{r.location}</p>
+                      </div>
+                      {r.timestamp?.seconds && (
+                        <span className="text-xs text-gray-600 font-medium">
+                          {new Date(r.timestamp.seconds * 1000).toLocaleDateString()}
+                        </span>
+                      )}
+                    </div>
+                    <div className="p-3 bg-white/5 rounded-xl border border-white/5">
+                      <p className="text-xs font-bold text-gray-500 uppercase mb-1">Prescribed Medicine</p>
+                      <p className="text-sm text-gray-300">{r.medicine}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+      </div>
+    </div>
+  );
+}
