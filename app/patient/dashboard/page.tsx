@@ -5,8 +5,16 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/components/AuthProvider";
 import { db } from "@/lib/firebase";
 import { collection, query, where, getDocs, onSnapshot, updateDoc, doc } from "firebase/firestore";
+import dynamic from 'next/dynamic';
+import { QRCodeSVG } from 'qrcode.react';
 
-type Step = "dashboard" | "symptoms" | "followup" | "results" | "records";
+// Map needs to be dynamically imported with SSR disabled because it relies on window object
+const MapWithNoSSR = dynamic(() => import("@/components/Map"), {
+  ssr: false,
+  loading: () => <div className="h-[400px] bg-white/5 border border-white/10 rounded-2xl flex items-center justify-center text-gray-500">Loading Map...</div>
+});
+
+type Step = "dashboard" | "symptoms" | "followup" | "location" | "results" | "records";
 
 export default function PatientDashboard() {
   const { user } = useAuth();
@@ -15,7 +23,8 @@ export default function PatientDashboard() {
 
   // Symptom form
   const [symptoms, setSymptoms] = useState("");
-  const [location, setLocation] = useState("");
+  const [locationName, setLocationName] = useState("");
+  const [latLng, setLatLng] = useState<{lat: number, lng: number} | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
 
@@ -30,7 +39,9 @@ export default function PatientDashboard() {
   const [doctors, setDoctors] = useState<any[]>([]);
   const [loadingDoctors, setLoadingDoctors] = useState(false);
   const [bookingSlot, setBookingSlot] = useState<string>("");
-  const [booked, setBooked] = useState(false);
+  const [bookedDoctor, setBookedDoctor] = useState<any>(null);
+  const [bookedStatus, setBookedStatus] = useState<"none" | "pending_confirmation" | "confirmed">("none");
+  const [consultationType, setConsultationType] = useState<"in-person" | "google-meet" | "platform-video" | null>(null);
 
   // Previous records
   const [records, setRecords] = useState<any[]>([]);
@@ -39,6 +50,21 @@ export default function PatientDashboard() {
   useEffect(() => {
     if (!user) router.push('/login');
   }, [user, router]);
+
+  // Listen to ticket updates for confirmation
+  useEffect(() => {
+    if (!ticketId || bookedStatus === "none") return;
+    const unsub = onSnapshot(doc(db, "Tickets", ticketId), (docSnap) => {
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        if (data.status === "booked") {
+          setBookedStatus("confirmed");
+        }
+      }
+    });
+    return () => unsub();
+  }, [ticketId, bookedStatus]);
+
 
   const fetchDoctors = async (triageResult: any, loc: string) => {
     setLoadingDoctors(true);
@@ -59,7 +85,8 @@ export default function PatientDashboard() {
         const matchingUser = allDoctorUsers.find(u => u.uid === p.id);
         if (!matchingUser) return;
 
-        const isNearby = matchingUser.location === loc;
+        // Simplify nearby logic based on the user's selected zone for now
+        const isNearby = matchingUser.location === loc || !loc; 
         const isOnline = pData.isOnline || matchingUser.isOnline;
 
         // Show if nearby OR if they offer online consultations (always visible)
@@ -113,8 +140,7 @@ export default function PatientDashboard() {
     }
   };
 
-
-  const handleSubmitSymptoms = async (skipFollowup = false) => {
+  const handleInitialSubmit = async (skipFollowup = false) => {
     setIsSubmitting(true);
     setError("");
 
@@ -128,7 +154,7 @@ export default function PatientDashboard() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           symptoms: finalSymptoms,
-          location,
+          location: locationName || "Sri Lanka",
           skip_followup: skipFollowup,
           patient_uid: user?.uid || "guest",
           patient_name: user?.name || "Patient",
@@ -145,8 +171,8 @@ export default function PatientDashboard() {
         setTriage(data.triage);
         setTicketId(data.ticketId);
         setIsMild(data.isMild);
-        await fetchDoctors(data.triage, location);
-        setStep("results");
+        // Ask for precise location via map before finding doctors
+        setStep("location");
       }
     } catch (err: any) {
       setError(err.message);
@@ -155,16 +181,26 @@ export default function PatientDashboard() {
     }
   };
 
-  const handleBook = async (docUid: string, time: string) => {
+  const handleLocationSubmit = async () => {
+    await fetchDoctors(triage, locationName);
+    setStep("results");
+  };
+
+  const handleBook = async (docObj: any, slot: any, type: "in-person" | "google-meet" | "platform-video") => {
     if (!ticketId) return;
     try {
       await updateDoc(doc(db, "Tickets", ticketId), {
-        status: "booked",
-        assigned_doc_uid: docUid,
-        appointment_time: time,
+        status: "pending_confirmation",
+        assigned_doc_uid: docObj.uid,
+        appointment_time: slot.time,
+        consultation_type: type,
+        // E.g. "Room 1" if available in slot, else default to "Room 1"
+        room: slot.room || "Room 1", 
       });
-      setBookingSlot(time);
-      setBooked(true);
+      setBookingSlot(slot.time);
+      setBookedDoctor(docObj);
+      setConsultationType(type);
+      setBookedStatus("pending_confirmation");
     } catch (e) {
       alert("Booking failed.");
     }
@@ -250,30 +286,16 @@ export default function PatientDashboard() {
                 />
               </div>
 
-              <div>
-                <label className="block text-sm font-bold text-gray-400 mb-2">Your zone (Colombo)</label>
-                <select
-                  value={location}
-                  onChange={e => setLocation(e.target.value)}
-                  className="w-full px-5 py-4 bg-black border border-white/10 rounded-2xl focus:ring-2 focus:ring-red-500 outline-none transition text-white"
-                >
-                  <option value="" disabled>Select your zone</option>
-                  {[1,2,3,4,5,6,7,8,9].map(n => (
-                    <option key={n} value={`Colombo ${n}`}>Colombo {n}</option>
-                  ))}
-                </select>
-              </div>
-
               {error && (
                 <div className="p-4 bg-red-900/30 border border-red-500/40 text-red-300 rounded-xl text-sm">{error}</div>
               )}
 
               <button
-                disabled={!symptoms || !location || isSubmitting}
-                onClick={() => handleSubmitSymptoms(false)}
+                disabled={!symptoms || isSubmitting}
+                onClick={() => handleInitialSubmit(false)}
                 className="w-full py-5 bg-red-600 hover:bg-red-500 font-black text-lg rounded-2xl transition disabled:opacity-40 shadow-lg shadow-red-900/30"
               >
-                {isSubmitting ? "Analysing symptoms..." : "Find Available Doctors"}
+                {isSubmitting ? "Analysing symptoms..." : "Continue"}
               </button>
             </div>
           </div>
@@ -308,14 +330,14 @@ export default function PatientDashboard() {
             <div className="flex gap-4">
               <button
                 disabled={!answers || isSubmitting}
-                onClick={() => handleSubmitSymptoms(false)}
+                onClick={() => handleInitialSubmit(false)}
                 className="flex-1 py-4 bg-red-600 hover:bg-red-500 font-black rounded-2xl transition disabled:opacity-40"
               >
                 {isSubmitting ? "Analysing..." : "Submit Answers"}
               </button>
               <button
                 disabled={isSubmitting}
-                onClick={() => handleSubmitSymptoms(true)}
+                onClick={() => handleInitialSubmit(true)}
                 className="px-6 py-4 bg-white/10 hover:bg-white/20 font-bold rounded-2xl transition disabled:opacity-40 text-sm"
               >
                 Skip
@@ -324,17 +346,84 @@ export default function PatientDashboard() {
           </div>
         )}
 
+        {/* ── LOCATION MAP ── */}
+        {step === "location" && (
+          <div className="animate-fade-in">
+             <h2 className="text-4xl font-black mb-2">Where are you?</h2>
+             <p className="text-gray-400 mb-8">Drop a pin on the map or select your zone to find nearby doctors.</p>
+
+             <div className="mb-6">
+                <MapWithNoSSR onLocationSelected={(lat, lng) => setLatLng({lat, lng})} />
+             </div>
+
+             <div className="mb-6">
+                <label className="block text-sm font-bold text-gray-400 mb-2">Or select your zone (Colombo)</label>
+                <select
+                  value={locationName}
+                  onChange={e => setLocationName(e.target.value)}
+                  className="w-full px-5 py-4 bg-black border border-white/10 rounded-2xl focus:ring-2 focus:ring-red-500 outline-none transition text-white"
+                >
+                  <option value="" disabled>Select your zone</option>
+                  {[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15].map(n => (
+                    <option key={n} value={`Colombo ${n}`}>Colombo {n}</option>
+                  ))}
+                </select>
+             </div>
+
+             <button
+                onClick={handleLocationSubmit}
+                className="w-full py-5 bg-red-600 hover:bg-red-500 font-black text-lg rounded-2xl transition shadow-lg shadow-red-900/30"
+              >
+                Find Doctors
+              </button>
+          </div>
+        )}
+
         {/* ── DOCTOR RESULTS ── */}
         {step === "results" && (
           <div>
-            {booked ? (
-              <div className="text-center py-16">
-                <div className="text-6xl mb-6">✅</div>
-                <h2 className="text-3xl font-black mb-3">Appointment Booked!</h2>
-                <p className="text-gray-400 mb-8">Your appointment is confirmed for <span className="text-white font-bold">{bookingSlot}</span>.</p>
+            {bookedStatus !== "none" ? (
+              <div className="text-center py-12 max-w-lg mx-auto bg-white/5 border border-white/10 p-8 rounded-3xl">
+                {bookedStatus === "pending_confirmation" ? (
+                  <>
+                    <div className="text-6xl mb-6 animate-pulse">⏳</div>
+                    <h2 className="text-3xl font-black mb-3 text-yellow-500">Pending Confirmation</h2>
+                    <p className="text-gray-400 mb-8">Waiting for {bookedDoctor?.name} to confirm your appointment for <span className="text-white font-bold">{bookingSlot}</span>.</p>
+                  </>
+                ) : (
+                  <>
+                    <div className="text-6xl mb-6">✅</div>
+                    <h2 className="text-3xl font-black mb-3 text-green-500">Appointment Confirmed!</h2>
+                    <p className="text-gray-400 mb-6">Your appointment is locked in for <span className="text-white font-bold">{bookingSlot}</span>.</p>
+                    
+                    {/* Show join links for online consultations, OR QR code for in-person */}
+                    {consultationType === "google-meet" ? (
+                      <div className="mb-8">
+                        <a href={bookedDoctor?.meetLink || "#"} target="_blank" rel="noopener noreferrer" className="px-8 py-4 bg-green-600 hover:bg-green-500 font-black rounded-2xl transition inline-block text-white shadow-lg shadow-green-900/30">
+                          🎥 Join Google Meet
+                        </a>
+                      </div>
+                    ) : consultationType === "platform-video" ? (
+                      <div className="mb-8">
+                        <button onClick={() => router.push(`/patient/consultation/${ticketId}`)} className="px-8 py-4 bg-blue-600 hover:bg-blue-500 font-black rounded-2xl transition inline-block text-white shadow-lg shadow-blue-900/30">
+                          🖥️ Join Platform Video
+                        </button>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="bg-white p-6 rounded-2xl inline-block mb-6 shadow-xl shadow-green-900/20">
+                          <QRCodeSVG value={`TICKET:${ticketId}|PATIENT:${user.uid}`} size={200} />
+                        </div>
+                        <p className="text-sm text-gray-500 mb-2 uppercase tracking-wider font-bold">Show this QR Code at the counter</p>
+                      </>
+                    )}
+                    <p className="text-xs text-gray-600 mb-8 mt-2">Ticket ID: {ticketId}</p>
+                  </>
+                )}
+
                 <button
-                  onClick={() => { setStep("dashboard"); setBooked(false); setSymptoms(""); setAnswers(""); setDoctors([]); }}
-                  className="px-8 py-4 bg-white text-black font-black rounded-2xl hover:bg-gray-200 transition"
+                  onClick={() => { setStep("dashboard"); setBookedStatus("none"); setSymptoms(""); setAnswers(""); setDoctors([]); }}
+                  className="px-8 py-4 bg-white text-black font-black rounded-2xl hover:bg-gray-200 transition w-full"
                 >
                   Back to Dashboard
                 </button>
@@ -345,13 +434,9 @@ export default function PatientDashboard() {
                   ← Back
                 </button>
 
-                {isMild ? (
+                {isMild && (
                   <div className="mb-6 p-4 bg-green-900/20 border border-green-500/30 rounded-2xl text-green-300 text-sm font-medium">
                     ✅ Good news — your symptoms are non-critical. You can book directly!
-                  </div>
-                ) : (
-                  <div className="mb-6 p-4 bg-yellow-900/20 border border-yellow-500/30 rounded-2xl text-yellow-300 text-sm font-medium">
-                    ⚠️ Your case has been flagged for admin review. You may still book directly while it's being reviewed.
                   </div>
                 )}
 
@@ -404,28 +489,44 @@ export default function PatientDashboard() {
                         ) : (
                           <div>
                             <p className="text-xs text-gray-500 font-bold uppercase tracking-wider mb-3">Book a Slot</p>
-                            <div className="flex flex-wrap gap-3">
+                            <div className="space-y-4">
                               {d.slots.map((slot: any, i: number) => (
-                                <button
-                                  key={i}
-                                  onClick={() => handleBook(d.uid, slot.time)}
-                                  className="px-4 py-2 bg-white text-black font-bold rounded-xl hover:bg-red-500 hover:text-white transition text-sm"
-                                >
-                                  {slot.time}
-                                  {slot.duration_mins && <span className="ml-1 text-xs opacity-70">({slot.duration_mins}m)</span>}
-                                </button>
+                                <div key={i} className="flex flex-col sm:flex-row gap-3 items-start sm:items-center p-3 rounded-xl border border-white/5 bg-black/50">
+                                  <div className="flex-1 font-bold text-sm">
+                                    {slot.time} <span className="text-gray-500 font-normal">({slot.duration_mins || 15}m)</span>
+                                    {slot.room && <span className="ml-2 text-xs text-blue-400">[{slot.room}]</span>}
+                                  </div>
+                                  
+                                  <div className="flex gap-2">
+                                    {/* Options for type of consultation based on doc profile */}
+                                    {!d.isOnlineOnly && (
+                                      <button
+                                        onClick={() => handleBook(d, slot, "in-person")}
+                                        className="px-4 py-2 bg-white/10 hover:bg-white/20 text-white font-bold rounded-lg transition text-xs"
+                                      >
+                                        In-Person
+                                      </button>
+                                    )}
+                                    {d.isOnline && (
+                                      <>
+                                        <button
+                                          onClick={() => handleBook(d, slot, "google-meet")}
+                                          className="px-4 py-2 bg-green-900/40 hover:bg-green-800/60 text-green-400 font-bold rounded-lg transition text-xs"
+                                        >
+                                          Google Meet
+                                        </button>
+                                        <button
+                                          onClick={() => handleBook(d, slot, "platform-video")}
+                                          className="px-4 py-2 bg-blue-900/40 hover:bg-blue-800/60 text-blue-400 font-bold rounded-lg transition text-xs"
+                                        >
+                                          Platform Video
+                                        </button>
+                                      </>
+                                    )}
+                                  </div>
+                                </div>
                               ))}
                             </div>
-                            {d.isOnline && d.meetLink && (
-                              <a
-                                href={d.meetLink}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="inline-flex items-center gap-2 mt-4 text-xs text-green-400 hover:text-green-300 transition font-bold"
-                              >
-                                🎥 Join via Google Meet after booking
-                              </a>
-                            )}
                           </div>
                         )}
                       </div>
