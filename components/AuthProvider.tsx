@@ -43,11 +43,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     <AuthContext.Provider value={{ user, login, logout }}>
       <div className="flex flex-col min-h-screen">
         {user && pathname !== "/login" && (
-          <nav className="p-4 glass-panel border-b border-white/10 flex justify-between items-center z-50">
-            <span className="font-bold text-white uppercase tracking-widest text-sm">WebRoute</span>
+          <nav className="w-full max-w-6xl mx-auto p-6 flex justify-between items-center z-50">
+            <div className="flex items-center gap-8">
+              <span className="font-black text-2xl text-white tracking-tighter cursor-pointer" onClick={() => router.push('/')}>
+                <span style={{ color: 'var(--spidey-red)' }}>WEB</span>ROUTE
+              </span>
+              
+              <div className="hidden md:flex gap-6 text-sm font-bold tracking-wider uppercase text-gray-300">
+                <a href="/" className="hover:text-white hover:border-b-2 border-red-600 pb-1 transition-all">Home</a>
+                <a href="/" className="hover:text-white hover:border-b-2 border-red-600 pb-1 transition-all">About us</a>
+                {user.role === 'patient' && (
+                  <a href="/patient/triage" className="hover:text-white hover:border-b-2 border-red-600 pb-1 transition-all">Triage</a>
+                )}
+                {user.role === 'admin' && (
+                  <a href="/admin/queue" className="hover:text-white hover:border-b-2 border-red-600 pb-1 transition-all">Queue</a>
+                )}
+                {(user.role === 'doctor' || user.role === 'hospital') && (
+                  <a href="/doctor/dashboard" className="hover:text-white hover:border-b-2 border-red-600 pb-1 transition-all">Dashboard</a>
+                )}
+              </div>
+            </div>
+            
             <div className="flex gap-4 items-center">
-              <span className="text-gray-300 text-sm">Logged in as <strong className="text-white">{user.name}</strong> ({user.role})</span>
-              <button onClick={logout} className="px-3 py-1 bg-red-600/20 text-red-400 border border-red-500/50 rounded hover:bg-red-600 hover:text-white transition text-xs font-bold">LOGOUT</button>
+              <span className="text-gray-400 text-xs font-bold uppercase tracking-widest"><strong className="text-white">{user.name}</strong></span>
+              <button onClick={logout} className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-full transition text-xs font-bold uppercase tracking-wider shadow-lg shadow-red-500/30">LOGOUT</button>
             </div>
           </nav>
         )}
