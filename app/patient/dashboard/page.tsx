@@ -132,41 +132,39 @@ export default function PatientDashboard() {
         if (!matchingUser) return;
         const isNearby = matchingUser.location === loc || !loc;
         const isOnline = pData.isOnline || matchingUser.isOnline;
-        if (isNearby || isOnline) {
           if (matchingUser.role === "hospital") {
-          const hospDoctors = pData.doctors || [];
-          hospDoctors.forEach((hd: any) => {
+            const hospDoctors = pData.doctors || [];
+            hospDoctors.forEach((hd: any) => {
+              let isRecommended = false;
+              if (triageResult) {
+                const reqSpec = triageResult.required_specialty || "";
+                if (triageResult.urgency_level > 2 && hd.specialty === reqSpec) isRecommended = true;
+              }
+              found.push({
+                uid: p.id,
+                subDocId: hd.id,
+                name: `${hd.name} (${matchingUser.name})`,
+                role: 'hospital_doctor',
+                specialty: hd.specialty,
+                location: matchingUser.location,
+                ranges: hd.ranges || [],
+                isOnline, meetLink: pData.meetLink, isNearby, isRecommended
+              });
+            });
+          } else {
             let isRecommended = false;
             if (triageResult) {
               const reqSpec = triageResult.required_specialty || "";
-              if (triageResult.urgency_level > 2 && hd.specialty === reqSpec) isRecommended = true;
+              if (triageResult.urgency_level <= 2 && pData.specialty === "General Practitioner") isRecommended = true;
+              else if (triageResult.urgency_level > 2 && pData.specialty === reqSpec) isRecommended = true;
             }
             found.push({
-              uid: p.id,
-              subDocId: hd.id,
-              name: `${hd.name} (${matchingUser.name})`,
-              role: 'hospital_doctor',
-              specialty: hd.specialty,
-              location: matchingUser.location,
-              ranges: hd.ranges || [],
+              uid: p.id, subDocId: null, name: matchingUser.name, role: matchingUser.role,
+              specialty: pData.specialty, location: matchingUser.location,
+              ranges: pData.ranges || [],
               isOnline, meetLink: pData.meetLink, isNearby, isRecommended
             });
-          });
-        } else {
-          let isRecommended = false;
-          if (triageResult) {
-            const reqSpec = triageResult.required_specialty || "";
-            if (triageResult.urgency_level <= 2 && pData.specialty === "General Practitioner") isRecommended = true;
-            else if (triageResult.urgency_level > 2 && pData.specialty === reqSpec) isRecommended = true;
           }
-          found.push({
-            uid: p.id, subDocId: null, name: matchingUser.name, role: matchingUser.role,
-            specialty: pData.specialty, location: matchingUser.location,
-            ranges: pData.ranges || [],
-            isOnline, meetLink: pData.meetLink, isNearby, isRecommended
-          });
-        }
-      }
       });
       found.sort((a, b) => (a.isNearby && !b.isNearby) ? -1 : (!a.isNearby && b.isNearby) ? 1 : 0);
       setDoctors(found);
@@ -650,6 +648,19 @@ export default function PatientDashboard() {
                                   "{explanations[d.subDocId || d.uid]}"
                                 </div>
                               ) : null}
+                           </div>
+                        )}
+
+                        {d.ranges && d.ranges.length > 0 && (
+                           <div className="mb-4">
+                             <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: 14, letterSpacing: 1, marginBottom: 4 }}>SCHEDULE:</div>
+                             <div className="flex flex-wrap gap-2">
+                               {d.ranges.map((r: any, idx: number) => (
+                                 <span key={idx} className="pixel-inset" style={{ backgroundColor: 'rgba(0,0,0,0.2)', color: 'var(--btn-cyan)', padding: '4px 8px', fontSize: 14 }}>
+                                   {r.start} - {r.end}
+                                 </span>
+                               ))}
+                             </div>
                            </div>
                         )}
 
