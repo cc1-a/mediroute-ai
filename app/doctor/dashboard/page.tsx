@@ -103,7 +103,33 @@ export default function DoctorDashboardPage() {
     if (!newRangeStart || !newRangeEnd || !profile || !user?.uid) return;
     setIsSavingSlot(true);
     try {
-      const newRange = { start: newRangeStart, end: newRangeEnd };
+      const sNew = newRangeStart;
+      const eNew = newRangeEnd;
+      if (sNew >= eNew) {
+        alert("Invalid range: start time must be before end time.");
+        setIsSavingSlot(false);
+        return;
+      }
+
+      let existingRanges: any[] = [];
+      if (user.role === 'hospital' && doctorId) {
+        const d = profile.doctors?.find((doc: any) => doc.id === doctorId);
+        if (d) existingRanges = d.ranges || [];
+      } else {
+        existingRanges = profile.ranges || [];
+      }
+
+      const hasOverlap = existingRanges.some((r: any) => {
+        return r.start < eNew && sNew < r.end;
+      });
+
+      if (hasOverlap) {
+        alert("Invalid range: overlaps with an existing time range.");
+        setIsSavingSlot(false);
+        return;
+      }
+
+      const newRange = { start: sNew, end: eNew };
       let updatedProfile = { ...profile };
 
       if (user.role === 'hospital' && doctorId) {

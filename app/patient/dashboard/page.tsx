@@ -285,7 +285,7 @@ export default function PatientDashboard() {
       setBookingSlot(slot.time); setBookedDoctor(docObj); setConsultationType(type);
       setBookedStatus("pending_confirmation");
       clearDraft();
-    } catch { alert("Booking failed."); }
+    } catch (err: any) { alert(err.message || "Booking failed."); }
   };
 
   const handleExplainToggle = async (docObj: any) => {

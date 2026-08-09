@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/firebase';
-import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, query, where, getDocs } from 'firebase/firestore';
 import { medicalRadarIndex } from '@/lib/pinecone';
 
 async function getEmbedding(text: string): Promise<number[]> {
@@ -41,6 +41,27 @@ export async function POST(request: Request) {
     } = body;
 
     const ticketsRef = collection(db, 'Tickets');
+
+    // Prevent Double-Booking
+    const q = query(
+      ticketsRef,
+      where("assigned_doc_uid", "==", assigned_doc_uid),
+      where("appointment_time", "==", appointment_time),
+      where("status", "in", ["pending_confirmation", "confirmed"])
+    );
+    const existingSnap = await getDocs(q);
+    let isBooked = false;
+    existingSnap.forEach(d => {
+       const data = d.data();
+       if (data.subDocId === (subDocId || null)) {
+         isBooked = true;
+       }
+    });
+
+    if (isBooked) {
+      return NextResponse.json({ error: 'This time slot has already been booked.' }, { status: 409 });
+    }
+
     const newTicket = {
       patient_uid: patient_uid || "guest_uid",
       patient_name: patient_name || "Demo Patient",
