@@ -19,11 +19,37 @@ const users = [
 ];
 
 const doctorProfiles = [
-  { uid: 'hospital1', specialty: 'General', available_slots: [{ time: '10:00 AM - Line 1', duration_mins: 15, booked: false }, { time: '10:15 AM - Line 2', duration_mins: 15, booked: false }] },
-  { uid: 'hospital2', specialty: 'Cardiology', available_slots: [{ time: '11:00 AM', duration_mins: 30, booked: false }] },
-  { uid: 'doctor1', specialty: 'Neurology', available_slots: [{ time: '09:00 AM', duration_mins: 20, booked: false }] },
-  { uid: 'doctor2', specialty: 'Infectious Disease', available_slots: [{ time: '14:00 PM', duration_mins: 10, booked: false }] },
-  { uid: 'doctor3', specialty: 'General', available_slots: [{ time: '16:00 PM', duration_mins: 15, booked: false }], isOnline: true, meetLink: 'https://meet.google.com/abc-xyz-123' },
+  { 
+    uid: 'hospital1', 
+    doctors: [
+      { id: 'doc_1', name: 'Dr. Reed Richards', specialty: 'General Practitioner', ranges: [{ start: '08:00', end: '12:00' }, { start: '13:00', end: '17:00' }] },
+      { id: 'doc_2', name: 'Dr. Susan Storm', specialty: 'Neurology', ranges: [{ start: '09:00', end: '15:00' }] }
+    ]
+  },
+  { 
+    uid: 'hospital2', 
+    doctors: [
+      { id: 'doc_3', name: 'Dr. Bruce Banner', specialty: 'Cardiology', ranges: [{ start: '10:00', end: '16:00' }] },
+      { id: 'doc_4', name: 'Dr. Tony Stark', specialty: 'Orthopedics', ranges: [{ start: '14:00', end: '20:00' }] }
+    ]
+  },
+  { 
+    uid: 'doctor1', 
+    specialty: 'Neurology', 
+    ranges: [{ start: '09:00', end: '14:00' }] 
+  },
+  { 
+    uid: 'doctor2', 
+    specialty: 'Infectious Disease', 
+    ranges: [{ start: '10:00', end: '18:00' }] 
+  },
+  { 
+    uid: 'doctor3', 
+    specialty: 'General Practitioner', 
+    ranges: [{ start: '16:00', end: '22:00' }], 
+    isOnline: true, 
+    meetLink: 'https://meet.google.com/abc-xyz-123' 
+  },
 ];
 
 const medicalLogs = [
