@@ -21,105 +21,150 @@ export default function AdminRadarPage() {
 
   useEffect(() => {
     const q = query(collection(db, "Alerts"), orderBy("timestamp", "desc"));
-    
-    const unsubscribe = onSnapshot(q, (querySnapshot) => {
+    const unsubscribe = onSnapshot(q, querySnapshot => {
       const alertsData: Alert[] = [];
       const locations = new Set<string>();
-      
-      querySnapshot.forEach((doc) => {
+      querySnapshot.forEach(doc => {
         const data = doc.data() as any;
         const { id, ...rest } = data;
         alertsData.push({ id: doc.id, ...rest });
-        
         locations.add(data.location);
       });
-      
       setAlerts(alertsData);
       setActiveLocations(locations);
     });
-
     return () => unsubscribe();
   }, []);
 
+  const s: React.CSSProperties = { fontFamily: 'var(--font-retro)' };
+
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 p-8 font-sans">
-      <div className="max-w-7xl mx-auto space-y-8">
-        
-        <header className="flex items-center justify-between border-b border-slate-800 pb-6">
+    <div className="min-h-screen p-4" style={s}>
+      <div className="max-w-6xl mx-auto space-y-5">
+
+        {/* Header */}
+        <div
+          className="flex items-center justify-between"
+          style={{
+            backgroundColor: 'var(--bg-panel)',
+            padding: '16px 20px',
+            boxShadow: '0 -4px 0 var(--black), 0 4px 0 var(--black), -4px 0 0 var(--black), 4px 0 0 var(--black), 4px 8px 0 var(--black), 8px 4px 0 var(--black), 8px 8px 0 var(--black)',
+          }}
+        >
           <div>
-            <h1 className="text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-red-500 to-orange-400">
-              Outbreak Radar
-            </h1>
-            <p className="text-slate-400 mt-2">Global Epidemiological Command Center</p>
+            <div style={{ color: 'var(--btn-red)', fontSize: 30, letterSpacing: 5, textShadow: '2px 2px 0 var(--black)' }}>
+              🕷 OUTBREAK RADAR
+            </div>
+            <div style={{ color: 'var(--black)', fontSize: 17, letterSpacing: 2 }}>EPIDEMIOLOGICAL COMMAND CENTER</div>
           </div>
           {alerts.length > 0 && (
-            <div className="px-6 py-3 bg-red-500/20 border border-red-500/50 rounded-full flex items-center gap-3 animate-pulse">
-              <span className="w-3 h-3 rounded-full bg-red-500"></span>
-              <span className="text-red-400 font-bold tracking-widest uppercase text-sm">Active Anomalies Detected</span>
+            <div
+              className="pixel-border blink"
+              style={{ backgroundColor: 'var(--btn-red)', color: 'var(--white)', padding: '8px 16px', fontSize: 18, letterSpacing: 2 }}
+            >
+              ● ANOMALIES DETECTED
             </div>
           )}
-        </header>
+        </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          
-          {/* Status Grid / Mock Map */}
-          <div className="lg:col-span-2 space-y-6">
-            <h2 className="text-xl font-semibold text-slate-300 uppercase tracking-widest border-b border-slate-800 pb-2">
-              Territory Status
-            </h2>
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-              {CITIES.map((city) => {
-                const isActive = activeLocations.has(city);
-                return (
-                  <div 
-                    key={city}
-                    className={`h-40 rounded-2xl flex flex-col items-center justify-center border transition-all duration-500 ${
-                      isActive 
-                      ? 'bg-red-950/40 border-red-500 shadow-[0_0_30px_rgba(239,68,68,0.3)] animate-pulse' 
-                      : 'bg-slate-900/50 border-slate-800'
-                    }`}
-                  >
-                    <span className={`text-2xl font-bold mb-2 ${isActive ? 'text-red-400' : 'text-slate-600'}`}>
-                      {city}
-                    </span>
-                    {isActive ? (
-                      <span className="text-xs font-bold uppercase tracking-wider text-red-500 px-3 py-1 bg-red-950/50 rounded-full">
-                        Warning
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+
+          {/* Territory Grid */}
+          <div className="lg:col-span-2">
+            {/* Screen label */}
+            <div className="pixel-inset mb-3" style={{ backgroundColor: 'var(--map-bg)', padding: '8px 14px' }}>
+              <span style={{ color: 'rgba(255,255,255,0.5)', fontSize: 18, letterSpacing: 3 }}>[ TERRITORY STATUS ]</span>
+            </div>
+
+            {/* Map-like city grid — styled like the tracker */}
+            <div
+              className="pixel-inset relative overflow-hidden"
+              style={{
+                backgroundColor: 'var(--map-bg)',
+                backgroundImage: 'repeating-linear-gradient(25deg, transparent, transparent 40px, var(--map-grid) 40px, var(--map-grid) 44px), repeating-linear-gradient(-65deg, transparent, transparent 40px, var(--map-grid) 40px, var(--map-grid) 44px)',
+                padding: '20px',
+                minHeight: 320,
+              }}
+            >
+              {/* Ruler left */}
+              <div style={{ position: 'absolute', left: 8, top: 0, bottom: 0, width: 8, borderRight: '2px solid rgba(255,255,255,0.4)', background: 'repeating-linear-gradient(to bottom, rgba(255,255,255,0.4), rgba(255,255,255,0.4) 2px, transparent 2px, transparent 14px)' }} />
+
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 ml-4">
+                {CITIES.map(city => {
+                  const isActive = activeLocations.has(city);
+                  return (
+                    <div
+                      key={city}
+                      className={isActive ? 'pixel-border' : 'pixel-inset'}
+                      style={{
+                        height: 110,
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        backgroundColor: isActive ? 'var(--btn-red)' : 'rgba(0,0,0,0.4)',
+                        cursor: 'default',
+                      }}
+                    >
+                      <span style={{ fontSize: 20, fontFamily: 'var(--font-retro)', letterSpacing: 2, color: isActive ? 'var(--white)' : 'rgba(255,255,255,0.4)' }}>
+                        {city.toUpperCase()}
                       </span>
-                    ) : (
-                      <span className="text-xs font-bold uppercase tracking-wider text-emerald-600 px-3 py-1 bg-emerald-950/50 rounded-full">
-                        Clear
+                      <span
+                        className={isActive ? 'blink' : ''}
+                        style={{
+                          fontSize: 14,
+                          letterSpacing: 2,
+                          marginTop: 8,
+                          padding: '2px 8px',
+                          backgroundColor: isActive ? 'rgba(0,0,0,0.3)' : 'rgba(255,255,255,0.05)',
+                          color: isActive ? 'var(--white)' : 'rgba(255,255,255,0.3)',
+                        }}
+                      >
+                        {isActive ? '!! WARNING' : 'CLEAR'}
                       </span>
-                    )}
-                  </div>
-                );
-              })}
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           </div>
 
           {/* Alert Feed */}
-          <div className="space-y-6">
-            <h2 className="text-xl font-semibold text-slate-300 uppercase tracking-widest border-b border-slate-800 pb-2">
-              Live Alerts
-            </h2>
-            <div className="space-y-4 max-h-[600px] overflow-y-auto pr-2 custom-scrollbar">
+          <div>
+            <div className="pixel-inset mb-3" style={{ backgroundColor: 'var(--map-bg)', padding: '8px 14px' }}>
+              <span style={{ color: 'rgba(255,255,255,0.5)', fontSize: 18, letterSpacing: 3 }}>[ LIVE ALERTS ]</span>
+            </div>
+
+            <div
+              className="pixel-inset overflow-y-auto"
+              style={{ backgroundColor: 'var(--map-bg)', maxHeight: 400, padding: '8px' }}
+            >
               {alerts.length === 0 ? (
-                <div className="text-slate-500 text-center py-12 bg-slate-900/30 rounded-xl border border-slate-800/50">
-                  No active outbreak warnings.
+                <div style={{ color: 'rgba(255,255,255,0.3)', fontSize: 18, textAlign: 'center', padding: '40px 16px', letterSpacing: 2 }}>
+                  NO ACTIVE WARNINGS.
                 </div>
               ) : (
-                alerts.map((alert) => (
-                  <div key={alert.id} className="p-5 rounded-xl bg-slate-900 border border-red-500/30 hover:border-red-500/60 transition-colors relative overflow-hidden">
-                    <div className="absolute top-0 left-0 w-1 h-full bg-gradient-to-b from-red-500 to-orange-500"></div>
+                alerts.map(alert => (
+                  <div
+                    key={alert.id}
+                    className="pixel-border mb-3"
+                    style={{ backgroundColor: 'rgba(226,54,54,0.15)', padding: '12px 14px' }}
+                  >
                     <div className="flex justify-between items-start mb-2">
-                      <h3 className="font-bold text-red-400 text-lg">{alert.location}</h3>
-                      <span className="bg-red-500/20 text-red-300 text-xs font-bold px-2 py-1 rounded-md">
-                        {alert.count} Cases
+                      <div style={{ color: 'var(--btn-red)', fontSize: 20, letterSpacing: 2 }}>
+                        {alert.location?.toUpperCase()}
+                      </div>
+                      <span
+                        className="retro-badge"
+                        style={{ backgroundColor: 'var(--btn-red)', color: 'var(--white)', fontSize: 14 }}
+                      >
+                        {alert.count} CASES
                       </span>
                     </div>
-                    <p className="text-slate-300 text-sm mt-2 font-medium">Cluster Detected:</p>
-                    <p className="text-slate-400 text-sm mt-1">{alert.related_symptoms}</p>
-                    <div className="text-xs text-slate-600 mt-4 text-right">
+                    <div style={{ color: 'rgba(255,255,255,0.7)', fontSize: 16, marginBottom: 6 }}>
+                      {alert.related_symptoms}
+                    </div>
+                    <div style={{ color: 'rgba(255,255,255,0.3)', fontSize: 13, letterSpacing: 1 }}>
                       ID: {alert.id.slice(0, 8)}
                     </div>
                   </div>
@@ -128,6 +173,21 @@ export default function AdminRadarPage() {
             </div>
           </div>
 
+        </div>
+
+        {/* Footer */}
+        <div
+          className="text-center"
+          style={{
+            backgroundColor: 'var(--map-bg)',
+            color: 'rgba(255,255,255,0.4)',
+            fontSize: 15,
+            padding: '8px 12px',
+            letterSpacing: 1,
+            boxShadow: '0 -4px 0 var(--black), 0 4px 0 var(--black), -4px 0 0 var(--black), 4px 0 0 var(--black)',
+          }}
+        >
+          © MEDIROUTE AI · OUTBREAK RADAR · LIVE DATA
         </div>
       </div>
     </div>

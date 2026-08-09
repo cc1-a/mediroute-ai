@@ -9,7 +9,7 @@ export default function AdminQueuePage() {
 
   useEffect(() => {
     const q = query(collection(db, "Tickets"), where("status", "==", "pending_admin"));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
+    const unsubscribe = onSnapshot(q, snapshot => {
       const fetched = snapshot.docs.map(d => ({ id: d.id, ...d.data() } as any));
       fetched.sort((a, b) => b.urgency_level - a.urgency_level);
       setTickets(fetched);
@@ -23,65 +23,113 @@ export default function AdminQueuePage() {
         status: "pending_booking",
         emergency_flag: isEmergency,
       });
-    } catch {
-      alert("Failed to update ticket");
-    }
+    } catch { alert("Failed to update ticket"); }
   };
 
+  const s: React.CSSProperties = { fontFamily: 'var(--font-retro)' };
+
   return (
-    <div className="min-h-screen bg-black text-white p-8">
-      <div className="max-w-6xl mx-auto">
-        <div className="flex items-center justify-between mb-10">
+    <div className="min-h-screen p-4" style={s}>
+      <div className="max-w-5xl mx-auto">
+
+        {/* Header device bar */}
+        <div
+          className="flex items-center justify-between mb-6"
+          style={{
+            backgroundColor: 'var(--bg-panel)',
+            padding: '16px 20px',
+            boxShadow: '0 -4px 0 var(--black), 0 4px 0 var(--black), -4px 0 0 var(--black), 4px 0 0 var(--black), 4px 8px 0 var(--black), 8px 4px 0 var(--black), 8px 8px 0 var(--black)',
+          }}
+        >
           <div>
-            <h1 className="text-4xl font-black tracking-tight">Admin Dashboard</h1>
-            <p className="text-gray-500 mt-1">Review patient triage submissions and approve bookings.</p>
+            <div style={{ color: 'var(--btn-red)', fontSize: 30, letterSpacing: 5, textShadow: '2px 2px 0 var(--black)' }}>
+              🕷 ADMIN DASHBOARD
+            </div>
+            <div style={{ color: 'var(--black)', fontSize: 17, letterSpacing: 2 }}>REVIEW PATIENT TRIAGE SUBMISSIONS</div>
           </div>
-          <div className="px-4 py-2 bg-red-900/30 border border-red-500/30 text-red-400 rounded-xl font-bold text-sm">
-            {tickets.length} Pending
+          <div
+            className="pixel-border"
+            style={{ backgroundColor: 'var(--btn-red)', color: 'var(--white)', padding: '8px 16px', fontSize: 22, letterSpacing: 3 }}
+          >
+            {tickets.length} PENDING
           </div>
         </div>
 
         {tickets.length === 0 ? (
-          <div className="text-center py-24 text-gray-600">
-            <div className="text-5xl mb-4">✅</div>
-            <h2 className="text-2xl font-bold text-gray-500">All clear!</h2>
-            <p className="text-gray-600 mt-2">No pending triage submissions to review.</p>
+          <div className="pixel-inset" style={{ backgroundColor: 'var(--map-bg)', padding: '60px', textAlign: 'center' }}>
+            <div style={{ fontSize: 60, marginBottom: 16 }}>✅</div>
+            <div style={{ color: 'var(--btn-green)', fontSize: 28, letterSpacing: 4 }}>ALL CLEAR!</div>
+            <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: 20, marginTop: 8, letterSpacing: 2 }}>
+              NO PENDING TRIAGE SUBMISSIONS.
+            </div>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
             {tickets.map(ticket => (
-              <div key={ticket.id} className="p-6 rounded-2xl border border-white/10 bg-white/5 flex flex-col justify-between">
+              <div
+                key={ticket.id}
+                className="pixel-inset flex flex-col justify-between"
+                style={{ backgroundColor: 'var(--map-bg)', padding: 16 }}
+              >
+                {/* Ticket header */}
                 <div>
-                  <div className="flex justify-between items-start mb-4">
-                    <h3 className="font-bold text-lg text-white">{ticket.patient_name}</h3>
-                    <span className={`px-2 py-1 text-xs font-bold rounded-full ${
-                      ticket.urgency_level >= 4
-                        ? 'bg-red-900/40 text-red-300 border border-red-500/40'
-                        : 'bg-yellow-900/30 text-yellow-300 border border-yellow-500/30'
-                    }`}>
-                      Level {ticket.urgency_level}
+                  <div className="flex justify-between items-start mb-3">
+                    <div style={{ color: 'var(--white)', fontSize: 20, letterSpacing: 1 }}>{ticket.patient_name}</div>
+                    <span
+                      className="retro-badge"
+                      style={{
+                        backgroundColor: ticket.urgency_level >= 4 ? 'var(--btn-red)' : 'var(--btn-yellow)',
+                        color: ticket.urgency_level >= 4 ? 'var(--white)' : 'var(--black)',
+                        fontSize: 15,
+                      }}
+                    >
+                      LVL {ticket.urgency_level}
                     </span>
                   </div>
-                  <p className="text-gray-400 text-sm mb-4 line-clamp-2 italic">"{ticket.raw_symptoms}"</p>
-                  <div className="bg-white/5 p-4 rounded-xl border border-white/5 mb-4">
-                    <p className="text-xs text-blue-400 font-bold mb-1 uppercase">AI Summary</p>
-                    <p className="text-sm text-white">{ticket.core_symptoms}</p>
-                    <p className="text-xs text-gray-500 mt-2">{ticket.required_specialty} · {ticket.location}</p>
+
+                  {/* Raw symptoms */}
+                  <div
+                    className="pixel-inset mb-3"
+                    style={{ backgroundColor: 'rgba(0,0,0,0.4)', padding: '10px 12px' }}
+                  >
+                    <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: 14, letterSpacing: 2, marginBottom: 4 }}>
+                      PATIENT WORDS:
+                    </div>
+                    <div style={{ color: 'rgba(255,255,255,0.7)', fontSize: 17, fontStyle: 'italic' }}>
+                      "{ticket.raw_symptoms}"
+                    </div>
+                  </div>
+
+                  {/* AI summary */}
+                  <div
+                    className="pixel-inset mb-3"
+                    style={{ backgroundColor: 'rgba(0,0,0,0.3)', padding: '10px 12px' }}
+                  >
+                    <div style={{ color: 'var(--btn-cyan)', fontSize: 14, letterSpacing: 2, marginBottom: 4 }}>AI SUMMARY:</div>
+                    <div style={{ color: 'var(--white)', fontSize: 17 }}>{ticket.core_symptoms}</div>
+                    <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: 14, marginTop: 6 }}>
+                      {ticket.required_specialty} · {ticket.location}
+                    </div>
                   </div>
                 </div>
 
+                {/* Action buttons */}
                 <div className="flex gap-3 mt-2">
                   <button
+                    id={`emergency-${ticket.id}`}
                     onClick={() => handleReview(ticket.id, true)}
-                    className="flex-1 bg-red-600 hover:bg-red-500 font-bold py-2.5 rounded-xl transition text-sm"
+                    className="retro-btn retro-btn-red pixel-border flex-1"
+                    style={{ fontSize: 18, color: 'var(--white)' }}
                   >
-                    🚨 Emergency
+                    🚨 EMERGENCY
                   </button>
                   <button
+                    id={`approve-${ticket.id}`}
                     onClick={() => handleReview(ticket.id, false)}
-                    className="flex-1 bg-white/10 hover:bg-white/20 font-bold py-2.5 rounded-xl transition text-sm"
+                    className="retro-btn retro-btn-green pixel-border flex-1"
+                    style={{ fontSize: 18 }}
                   >
-                    ✅ Approve
+                    ✅ APPROVE
                   </button>
                 </div>
               </div>

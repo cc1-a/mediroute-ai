@@ -1,95 +1,330 @@
 @import "tailwindcss";
 
+
+/* =============================================
+   MEDIROUTE AI — SPIDEY RETRO PIXEL DESIGN SYSTEM
+   VT323 monospace pixel font + 8-bit border magic
+   ============================================= */
+
 :root {
-  /* Spider-Man Theme */
-  --background: #020617; /* Very deep slate/blue for dark mode vibe */
-  --foreground: #f8fafc;
-  
+  /* Core Spidey Palette */
+  --bg-dark: #0a0e1a;
+  --bg-panel: #b2d8d8;
+  --bg-panel-dark: #8ab5b5;
+  --map-bg: #111d2e;
+  --map-grid: #284469;
+
+  /* Button Colours */
+  --btn-green: #9be59b;
+  --btn-red: #E23636;
+  --btn-orange: #ffa34d;
+  --btn-cyan: #85b9c5;
+  --btn-yellow: #f0e060;
+  --btn-blue: #6699cc;
+
+  /* Core */
+  --black: #000000;
+  --white: #ffffff;
   --spidey-red: #E23636;
-  --spidey-blue: #0452b4;
-  --spidey-dark-blue: #022c66;
-  
-  /* Web Pattern SVG Background encoded */
   --spidey-dark-red: #991b1b;
-  --spidey-blue: #0f172a;
-  --spidey-dark-blue: #020617;
+
+  /* Pixel Scale */
+  --px: 4px;
+
+  /* Fonts */
+  --font-retro: 'VT323', 'Share Tech Mono', monospace;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-  
-  --color-spidey-red: var(--spidey-red);
-  --color-spidey-blue: var(--spidey-blue);
-  --color-spidey-dark: var(--spidey-dark-blue);
+/* ── Reset ── */
+* {
+  box-sizing: border-box;
+  user-select: none;
+}
+
+html, body {
+  height: 100%;
 }
 
 body {
-  background-color: var(--background);
-  color: var(--foreground);
-  font-family: var(--font-geist-sans), sans-serif;
-  /* Subtle noise/texture background for cinematic feel */
-  background-image: 
-    radial-gradient(circle at 50% 0%, #1a0000 0%, transparent 50%),
-    radial-gradient(circle at 100% 50%, #00051a 0%, transparent 50%);
+  background-color: var(--bg-dark);
+  color: var(--white);
+  font-family: var(--font-retro);
+  /* Tilted map-grid background texture */
+  background-image:
+    repeating-linear-gradient(25deg, transparent, transparent 40px, rgba(40, 68, 105, 0.25) 40px, rgba(40, 68, 105, 0.25) 42px),
+    repeating-linear-gradient(-65deg, transparent, transparent 40px, rgba(40, 68, 105, 0.25) 40px, rgba(40, 68, 105, 0.25) 42px);
   background-attachment: fixed;
 }
 
-/* Glass Panels - Updated to dark grey/black with subtle borders like the design */
+/* =============================================
+   PIXEL BORDER UTILITY  — the 8-bit corner magic
+   ============================================= */
+.pixel-border {
+  position: relative;
+  border: none;
+  margin: var(--px);
+  box-shadow:
+    0 calc(var(--px) * -1) 0 var(--black),
+    0 var(--px) 0 var(--black),
+    calc(var(--px) * -1) 0 0 var(--black),
+    var(--px) 0 0 var(--black),
+    var(--px) calc(var(--px) * 2) 0 var(--black),
+    calc(var(--px) * 2) var(--px) 0 var(--black),
+    calc(var(--px) * 2) calc(var(--px) * 2) 0 var(--black);
+  transition: transform 0.08s ease, box-shadow 0.08s ease;
+}
+
+.pixel-border:active,
+.pixel-border-active {
+  transform: translate(var(--px), var(--px));
+  box-shadow:
+    0 calc(var(--px) * -1) 0 var(--black),
+    0 var(--px) 0 var(--black),
+    calc(var(--px) * -1) 0 0 var(--black),
+    var(--px) 0 0 var(--black);
+}
+
+/* Inset pixel border for panels/screens */
+.pixel-inset {
+  box-shadow:
+    inset 0 var(--px) 0 var(--black),
+    inset 0 calc(var(--px) * -1) 0 var(--black),
+    inset var(--px) 0 0 var(--black),
+    inset calc(var(--px) * -1) 0 0 var(--black);
+}
+
+/* Outer device border */
+.device-border {
+  box-shadow:
+    0 -6px 0 var(--bg-panel), 0 6px 0 var(--bg-panel),
+    -6px 0 0 var(--bg-panel), 6px 0 0 var(--bg-panel),
+    0 -10px 0 var(--black), 0 10px 0 var(--black),
+    -10px 0 0 var(--black), 10px 0 0 var(--black);
+}
+
+/* =============================================
+   RETRO MAP SCREEN TEXTURE
+   ============================================= */
+.map-screen-bg {
+  background-color: var(--map-bg);
+  background-image:
+    repeating-linear-gradient(25deg, transparent, transparent 40px, var(--map-grid) 40px, var(--map-grid) 44px),
+    repeating-linear-gradient(-65deg, transparent, transparent 40px, var(--map-grid) 40px, var(--map-grid) 44px);
+}
+
+/* =============================================
+   RETRO BUTTONS
+   ============================================= */
+.retro-btn {
+  font-family: var(--font-retro);
+  font-size: 20px;
+  color: var(--black);
+  cursor: pointer;
+  padding: 6px 14px;
+  text-align: center;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  border: none;
+  outline: none;
+}
+
+.retro-btn:hover {
+  filter: brightness(1.15);
+}
+
+.retro-btn:focus-visible {
+  outline: 2px solid var(--white);
+  outline-offset: 2px;
+}
+
+/* Colour variants */
+.retro-btn-red    { background-color: var(--btn-red); color: var(--white); }
+.retro-btn-green  { background-color: var(--btn-green); }
+.retro-btn-orange { background-color: var(--btn-orange); }
+.retro-btn-cyan   { background-color: var(--btn-cyan); }
+.retro-btn-yellow { background-color: var(--btn-yellow); }
+.retro-btn-blue   { background-color: var(--btn-blue); color: var(--white); }
+.retro-btn-panel  { background-color: var(--bg-panel); }
+.retro-btn-white  { background-color: var(--white); }
+.retro-btn-dark   { background-color: var(--map-bg); color: var(--white); }
+
+/* Full-width retro button */
+.retro-btn-full {
+  width: 100%;
+  font-family: var(--font-retro);
+  font-size: 26px;
+  color: var(--black);
+  cursor: pointer;
+  padding: 10px 16px;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  border: none;
+  outline: none;
+}
+
+/* =============================================
+   RETRO INPUT / TEXTAREA / SELECT
+   ============================================= */
+.retro-input,
+.retro-textarea,
+.retro-select {
+  font-family: var(--font-retro);
+  font-size: 20px;
+  background-color: var(--map-bg);
+  color: var(--white);
+  border: 2px solid var(--black);
+  padding: 8px 12px;
+  outline: none;
+  width: 100%;
+  letter-spacing: 1px;
+  box-shadow:
+    inset 2px 2px 0 rgba(0,0,0,0.5),
+    inset -2px -2px 0 rgba(255,255,255,0.05);
+}
+
+.retro-input:focus,
+.retro-textarea:focus,
+.retro-select:focus {
+  border-color: var(--btn-red);
+  box-shadow:
+    inset 2px 2px 0 rgba(0,0,0,0.5),
+    0 0 0 2px var(--btn-red);
+}
+
+.retro-input::placeholder,
+.retro-textarea::placeholder {
+  color: rgba(255,255,255,0.25);
+}
+
+/* =============================================
+   RETRO PANEL / CARD
+   ============================================= */
+.retro-panel {
+  background-color: var(--bg-panel);
+  color: var(--black);
+}
+
+.retro-screen {
+  background-color: var(--map-bg);
+  color: var(--white);
+}
+
+/* Status badge */
+.retro-badge {
+  font-family: var(--font-retro);
+  font-size: 16px;
+  padding: 3px 10px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  border: 2px solid var(--black);
+}
+
+/* =============================================
+   HEADINGS
+   ============================================= */
+.retro-title {
+  font-family: var(--font-retro);
+  font-size: clamp(36px, 6vw, 72px);
+  color: var(--btn-red);
+  text-transform: uppercase;
+  letter-spacing: 4px;
+  text-shadow: 3px 3px 0 var(--black);
+  line-height: 1;
+}
+
+.retro-subtitle {
+  font-family: var(--font-retro);
+  font-size: clamp(18px, 3vw, 28px);
+  color: var(--white);
+  text-transform: uppercase;
+  letter-spacing: 3px;
+  text-shadow: 2px 2px 0 var(--black);
+}
+
+.retro-label {
+  font-family: var(--font-retro);
+  font-size: 18px;
+  color: var(--map-bg);
+  text-transform: uppercase;
+  letter-spacing: 2px;
+}
+
+/* =============================================
+   DIVIDER
+   ============================================= */
+.retro-divider {
+  border: none;
+  border-top: 4px solid var(--black);
+  margin: 0;
+}
+
+/* =============================================
+   SCROLLBAR
+   ============================================= */
+::-webkit-scrollbar {
+  width: 8px;
+  background: var(--map-bg);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--btn-red);
+  border: 2px solid var(--black);
+}
+
+/* =============================================
+   ANIMATIONS
+   ============================================= */
+@keyframes pixel-blink {
+  0%, 49% { opacity: 1; }
+  50%, 100% { opacity: 0; }
+}
+
+@keyframes pixel-pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.05); }
+}
+
+@keyframes scanline {
+  0% { transform: translateY(-100%); }
+  100% { transform: translateY(100vh); }
+}
+
+.blink { animation: pixel-blink 1s steps(1) infinite; }
+.pixel-pulse { animation: pixel-pulse 2s ease-in-out infinite; }
+
+/* Scanline overlay for screens */
+.scanlines::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    to bottom,
+    transparent 0px,
+    transparent 3px,
+    rgba(0,0,0,0.12) 3px,
+    rgba(0,0,0,0.12) 4px
+  );
+  z-index: 1;
+}
+
+/* =============================================
+   LEGACY GLASS (kept for backward compat)
+   ============================================= */
 .glass-panel {
-  background: rgba(20, 20, 20, 0.7);
-  backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.5);
+  background: rgba(17, 29, 46, 0.85);
+  border: 2px solid rgba(40, 68, 105, 0.8);
 }
 
 .glass-panel-red {
-  background: linear-gradient(145deg, rgba(226, 54, 54, 0.15) 0%, rgba(20, 20, 20, 0.8) 100%);
-  backdrop-filter: blur(10px);
-  border: 1px solid rgba(226, 54, 54, 0.3);
+  background: rgba(226, 54, 54, 0.12);
+  border: 2px solid rgba(226, 54, 54, 0.4);
 }
 
-/* Typography styles based on the image */
-.heading-red-dot {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-  gap: 0.75rem;
-  font-weight: 900;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-}
-
-.heading-red-dot::before {
-  content: '';
-  display: block;
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
-  background-color: var(--spidey-red);
-  box-shadow: 0 0 10px var(--spidey-red);
-  border: 2px solid white;
-}
-
-/* Custom Web Pattern Overlay */
+/* =============================================
+   WEB PATTERN (used as decorative overlay)
+   ============================================= */
 .web-pattern {
-  background-image: repeating-linear-gradient(45deg, transparent, transparent 40px, rgba(255,255,255,0.03) 40px, rgba(255,255,255,0.03) 41px),
-                    repeating-linear-gradient(-45deg, transparent, transparent 40px, rgba(255,255,255,0.03) 40px, rgba(255,255,255,0.03) 41px);
-}
-
-/* Dotted underline from the design */
-.red-dotted-underline {
-  border-bottom: 2px dotted var(--spidey-red);
-  padding-bottom: 0.5rem;
-  margin-bottom: 1rem;
-}
-
-/* Feature Box */
-.feature-box {
-  background: rgba(10, 10, 10, 0.8);
-  border: 1px solid rgba(255, 255, 255, 0.05);
-  border-radius: 1rem;
-  padding: 2rem;
+  background-image:
+    repeating-linear-gradient(45deg, transparent, transparent 40px, rgba(255,255,255,0.03) 40px, rgba(255,255,255,0.03) 41px),
+    repeating-linear-gradient(-45deg, transparent, transparent 40px, rgba(255,255,255,0.03) 40px, rgba(255,255,255,0.03) 41px);
 }

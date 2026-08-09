@@ -29,7 +29,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const login = (userData: any) => {
     localStorage.setItem("mediroute_user", JSON.stringify(userData));
     setUser(userData);
-    // Role-based redirect after login
     if (userData.role === 'patient') router.push('/patient/dashboard');
     else if (userData.role === 'admin') router.push('/admin/queue');
     else if (userData.role === 'doctor' || userData.role === 'hospital') router.push('/doctor/dashboard');
@@ -48,48 +47,83 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <AuthContext.Provider value={{ user, login, logout }}>
-      <div className="flex flex-col min-h-screen">
+      <div className="flex flex-col min-h-screen" style={{ fontFamily: 'var(--font-retro)' }}>
+
+        {/* ── RETRO NAV BAR ── */}
         {user && !isLoginPage && (
-          <nav className="w-full border-b border-white/10 bg-black/80 backdrop-blur-sm px-6 py-4 flex items-center justify-between sticky top-0 z-50">
-            <Link href="/" className="font-black text-xl tracking-tighter text-white">
-              MEDI<span className="text-red-600">ROUTE</span>
+          <nav
+            className="w-full flex items-center justify-between sticky top-0 z-50"
+            style={{
+              backgroundColor: 'var(--bg-panel)',
+              padding: '8px 16px',
+              boxShadow: '0 4px 0 var(--black)',
+            }}
+          >
+            {/* Logo */}
+            <Link
+              href="/"
+              className="font-black"
+              style={{ color: 'var(--btn-red)', fontSize: 24, letterSpacing: 4, textShadow: '2px 2px 0 var(--black)', fontFamily: 'var(--font-retro)', textDecoration: 'none' }}
+            >
+              🕷 MEDI<span style={{ color: 'var(--black)' }}>ROUTE</span>
             </Link>
 
-            <div className="flex items-center gap-6 text-sm font-bold">
+            {/* Nav links */}
+            <div className="flex items-center gap-2">
               {user.role === 'patient' && (
                 <>
-                  <Link href="/patient/dashboard" className="text-gray-400 hover:text-white transition">Dashboard</Link>
+                  <Link href="/patient/dashboard" id="nav-dashboard">
+                    <span className="retro-btn retro-btn-panel pixel-border" style={{ fontSize: 16, letterSpacing: 1 }}>DASHBOARD</span>
+                  </Link>
+                  <Link href="/patient/triage" id="nav-triage">
+                    <span className="retro-btn retro-btn-green pixel-border" style={{ fontSize: 16, letterSpacing: 1 }}>TRIAGE</span>
+                  </Link>
                 </>
               )}
               {user.role === 'admin' && (
                 <>
-                  <Link href="/admin/queue" className="text-gray-400 hover:text-white transition">Review Queue</Link>
-                  <Link href="/admin/radar" className="text-gray-400 hover:text-white transition">Outbreak Radar</Link>
+                  <Link href="/admin/queue" id="nav-queue">
+                    <span className="retro-btn retro-btn-orange pixel-border" style={{ fontSize: 16, letterSpacing: 1 }}>QUEUE</span>
+                  </Link>
+                  <Link href="/admin/radar" id="nav-radar">
+                    <span className="retro-btn retro-btn-red pixel-border" style={{ fontSize: 16, letterSpacing: 1, color: 'var(--white)' }}>RADAR</span>
+                  </Link>
                 </>
               )}
               {(user.role === 'doctor' || user.role === 'hospital') && (
                 <>
-                  <Link href="/doctor/dashboard" className="text-gray-400 hover:text-white transition">
-                    {user.role === 'hospital' ? 'Hospital Dashboard' : 'My Dashboard'}
+                  <Link href="/doctor/dashboard" id="nav-doctor-dash">
+                    <span className="retro-btn retro-btn-cyan pixel-border" style={{ fontSize: 16, letterSpacing: 1 }}>
+                      {user.role === 'hospital' ? 'HOSPITAL' : 'DASHBOARD'}
+                    </span>
                   </Link>
-                  <Link href="/doctor/schedule" className="text-gray-400 hover:text-white transition">Schedule</Link>
+                  <Link href="/doctor/schedule" id="nav-schedule">
+                    <span className="retro-btn retro-btn-panel pixel-border" style={{ fontSize: 16, letterSpacing: 1 }}>SCHEDULE</span>
+                  </Link>
                 </>
               )}
             </div>
 
-            <div className="flex items-center gap-4">
-              <span className="text-xs font-bold text-gray-600 uppercase tracking-wider hidden sm:block">
-                {user.name}
+            {/* User + Logout */}
+            <div className="flex items-center gap-2">
+              <span
+                className="pixel-inset"
+                style={{ backgroundColor: 'var(--map-bg)', color: 'rgba(255,255,255,0.6)', fontSize: 15, padding: '4px 10px', letterSpacing: 1, fontFamily: 'var(--font-retro)' }}
+              >
+                {user.name?.toUpperCase()}
               </span>
               <button
+                id="logout-btn"
                 onClick={logout}
-                className="px-4 py-2 border border-white/20 hover:border-white/50 hover:bg-white/10 text-white rounded-xl transition text-xs font-bold uppercase tracking-wider"
+                className="retro-btn retro-btn-red pixel-border"
+                style={{ fontSize: 16, color: 'var(--white)' }}
               >
-                Logout
+                LOGOUT
               </button>
             </div>
           </nav>
         )}
+
         <div className="flex-grow">
           {children}
         </div>

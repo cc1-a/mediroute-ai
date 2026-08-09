@@ -5,11 +5,28 @@ import { db } from "@/lib/firebase";
 import { collection, query, where, getDocs } from "firebase/firestore";
 import { useAuth } from "@/components/AuthProvider";
 
+const SpideyHead = ({ size = 80 }: { size?: number }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 250" width={size} height={size * 1.25}>
+    <ellipse cx="100" cy="125" rx="80" ry="110" fill="#E23636" stroke="#000" strokeWidth="4"/>
+    <g stroke="#000" strokeWidth="2" fill="none">
+      <line x1="100" y1="15" x2="100" y2="235" />
+      <path d="M 40 60 L 160 190" /><path d="M 160 60 L 40 190" />
+      <path d="M 25 100 L 175 150" /><path d="M 175 100 L 25 150" />
+      <path d="M 100 45 Q 120 50 145 75 M 100 45 Q 80 50 55 75" />
+      <path d="M 100 75 Q 130 80 165 110 M 100 75 Q 70 80 35 110" />
+      <path d="M 100 200 Q 120 195 145 170 M 100 200 Q 80 195 55 170" />
+      <path d="M 100 170 Q 130 165 165 135 M 100 170 Q 70 165 35 135" />
+    </g>
+    <path d="M 110 140 C 130 110, 150 90, 175 100 C 160 135, 140 150, 110 140 Z" fill="#FFFFFF" stroke="#000" strokeWidth="6" strokeLinejoin="round"/>
+    <path d="M 90 140 C 70 110, 50 90, 25 100 C 40 135, 60 150, 90 140 Z" fill="#FFFFFF" stroke="#000" strokeWidth="6" strokeLinejoin="round"/>
+  </svg>
+);
+
 const roles = [
-  { id: "patient", label: "Patient", icon: "🏥", desc: "Find doctors & book appointments" },
-  { id: "doctor", label: "Doctor", icon: "👨‍⚕️", desc: "Manage your consultations" },
-  { id: "hospital", label: "Hospital", icon: "🏨", desc: "Multi-doctor facility dashboard" },
-  { id: "admin", label: "Admin", icon: "🛡️", desc: "System oversight & triage review" },
+  { id: "patient",  label: "PATIENT",  icon: "🏥", desc: "Find doctors & book appointments",  color: 'var(--btn-green)' },
+  { id: "doctor",   label: "DOCTOR",   icon: "👨‍⚕️", desc: "Manage your consultations",          color: 'var(--btn-cyan)' },
+  { id: "hospital", label: "HOSPITAL", icon: "🏨", desc: "Multi-doctor facility dashboard",     color: 'var(--btn-cyan)' },
+  { id: "admin",    label: "ADMIN",    icon: "🛡️", desc: "System oversight & triage review",   color: 'var(--btn-orange)' },
 ];
 
 export default function LoginPage() {
@@ -28,7 +45,7 @@ export default function LoginPage() {
     setIsLoading(true);
 
     if (password !== "password") {
-      setError("Invalid password. (Hint: it's 'password')");
+      setError("!! INVALID PASSWORD (HINT: 'password')");
       setIsLoading(false);
       return;
     }
@@ -36,16 +53,15 @@ export default function LoginPage() {
     try {
       const q = query(collection(db, "Users"), where("username", "==", username));
       const snap = await getDocs(q);
-
       if (snap.empty) {
-        setError("User not found. Make sure you've seeded the database first.");
+        setError("!! USER NOT FOUND. SEED DATABASE FIRST.");
       } else {
         const userDoc = snap.docs[0];
         const userData = { uid: userDoc.id, ...userDoc.data() };
         login(userData);
       }
     } catch (err: any) {
-      setError(err.message || "An error occurred during login.");
+      setError(err.message || "!! CONNECTION ERROR.");
     } finally {
       setIsLoading(false);
     }
@@ -58,9 +74,9 @@ export default function LoginPage() {
       const res = await fetch('/api/seed');
       if (res.ok) {
         setSeeded(true);
-        setError("✅ Database seeded! All accounts are ready.");
+        setError(">> DATABASE SEEDED SUCCESSFULLY.");
       } else {
-        setError("Failed to seed database.");
+        setError("!! SEED FAILED.");
       }
     } catch (e: any) {
       setError(e.message);
@@ -69,128 +85,216 @@ export default function LoginPage() {
     }
   };
 
-  return (
-    <div className="min-h-screen bg-black text-white flex items-center justify-center p-6 relative">
-      <div className="absolute inset-0 pointer-events-none">
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[300px] bg-red-900/15 rounded-full blur-[100px]" />
-      </div>
+  const selectedRoleObj = roles.find(r => r.id === selectedRole);
 
-      <div className="w-full max-w-md relative z-10">
-        {/* Logo */}
-        <div className="text-center mb-10">
-          <h1 className="text-4xl font-black tracking-tighter mb-1">
-            MEDI<span className="text-red-600">ROUTE</span>
-          </h1>
-          <p className="text-gray-500 text-sm font-medium">Sign in to your account</p>
+  return (
+    <div
+      className="min-h-screen flex items-center justify-center p-4"
+      style={{ fontFamily: 'var(--font-retro)' }}
+    >
+      {/* Device Container */}
+      <div
+        className="w-full max-w-sm flex flex-col gap-0"
+        style={{
+          backgroundColor: 'var(--bg-panel)',
+          padding: '20px',
+          boxShadow: '0 -6px 0 var(--bg-panel), 0 6px 0 var(--bg-panel), -6px 0 0 var(--bg-panel), 6px 0 0 var(--bg-panel), 0 -10px 0 var(--black), 0 10px 0 var(--black), -10px 0 0 var(--black), 10px 0 0 var(--black)',
+        }}
+      >
+        {/* Screen Header */}
+        <div
+          className="relative overflow-hidden scanlines flex flex-col items-center justify-center gap-2 py-6"
+          style={{
+            backgroundColor: 'var(--map-bg)',
+            backgroundImage: 'repeating-linear-gradient(25deg, transparent, transparent 40px, var(--map-grid) 40px, var(--map-grid) 44px), repeating-linear-gradient(-65deg, transparent, transparent 40px, var(--map-grid) 40px, var(--map-grid) 44px)',
+            boxShadow: 'inset 0 4px 0 var(--black), inset 0 -4px 0 var(--black), inset 4px 0 0 var(--black), inset -4px 0 0 var(--black)',
+          }}
+        >
+          <SpideyHead size={70} />
+          <div style={{ color: 'var(--white)', fontSize: 36, letterSpacing: 5, textShadow: '2px 2px 0 var(--black)' }}>
+            MEDI<span style={{ color: 'var(--btn-red)' }}>ROUTE</span>
+          </div>
+          <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: 16, letterSpacing: 3 }}>
+            {selectedRole ? `UNIT: ${selectedRole.toUpperCase()}` : 'SELECT YOUR UNIT'}
+          </div>
         </div>
 
-        {!selectedRole ? (
-          /* Step 1: Role Selection */
-          <div className="space-y-3">
-            <p className="text-center text-gray-400 text-sm mb-6 font-medium">I am a...</p>
-            {roles.map((role) => (
+        {/* Controls Area */}
+        <div className="flex flex-col gap-3 mt-4">
+
+          {!selectedRole ? (
+            /* ─ STEP 1: Role Selection ─ */
+            <>
+              <div style={{ color: 'var(--black)', fontSize: 18, letterSpacing: 2, textAlign: 'center', marginBottom: 4 }}>
+                [ I AM A... ]
+              </div>
+
+              {roles.map(role => (
+                <button
+                  key={role.id}
+                  id={`role-${role.id}`}
+                  onClick={() => setSelectedRole(role.id)}
+                  className="retro-btn pixel-border retro-btn-full flex items-center gap-3"
+                  style={{ backgroundColor: role.color, textAlign: 'left', fontSize: 22 }}
+                >
+                  <span>{role.icon}</span>
+                  <div className="flex flex-col">
+                    <span>{role.label}</span>
+                    <span style={{ fontSize: 14, opacity: 0.7, textTransform: 'none', letterSpacing: 0 }}>{role.desc}</span>
+                  </div>
+                  <span className="ml-auto">▶</span>
+                </button>
+              ))}
+
+              {/* Seed Button */}
+              <div style={{ borderTop: '4px solid var(--black)', marginTop: 4, paddingTop: 12 }}>
+                <button
+                  id="seed-db-btn"
+                  onClick={handleSeed}
+                  disabled={isLoading || seeded}
+                  className="retro-btn retro-btn-blue pixel-border retro-btn-full"
+                  style={{ fontSize: 18, opacity: (isLoading || seeded) ? 0.6 : 1 }}
+                >
+                  {isLoading ? 'SEEDING...' : seeded ? '>> DB READY' : '[ SEED DEMO DATABASE ]'}
+                </button>
+              </div>
+            </>
+          ) : (
+            /* ─ STEP 2: Login Form ─ */
+            <>
               <button
-                key={role.id}
-                onClick={() => setSelectedRole(role.id)}
-                className="w-full flex items-center gap-4 p-5 rounded-2xl border border-white/10 bg-white/5 hover:bg-white/10 hover:border-white/30 transition-all group text-left"
+                id="back-btn"
+                onClick={() => { setSelectedRole(null); setError(''); }}
+                className="retro-btn retro-btn-panel pixel-border"
+                style={{ fontSize: 18, textAlign: 'left' }}
               >
-                <span className="text-3xl">{role.icon}</span>
+                ◀ BACK
+              </button>
+
+              {/* Selected role badge */}
+              <div
+                className="flex items-center gap-3 pixel-border"
+                style={{ backgroundColor: selectedRoleObj?.color || 'var(--btn-green)', padding: '10px 14px' }}
+              >
+                <span style={{ fontSize: 26 }}>{selectedRoleObj?.icon}</span>
                 <div>
-                  <div className="font-bold text-white group-hover:text-red-400 transition">{role.label}</div>
-                  <div className="text-xs text-gray-500">{role.desc}</div>
+                  <div style={{ fontSize: 22, fontFamily: 'var(--font-retro)', textTransform: 'uppercase', letterSpacing: 2 }}>{selectedRole} LOGIN</div>
+                  <div style={{ fontSize: 14, opacity: 0.7 }}>{selectedRoleObj?.desc}</div>
                 </div>
-                <span className="ml-auto text-gray-600 group-hover:text-white transition">→</span>
-              </button>
-            ))}
+              </div>
 
-            {/* Seed button */}
-            <div className="pt-4 border-t border-white/10">
-              <button
-                onClick={handleSeed}
-                disabled={isLoading || seeded}
-                className="w-full py-3 text-sm text-blue-400 border border-blue-500/30 bg-blue-500/10 hover:bg-blue-500/20 rounded-xl font-bold transition disabled:opacity-50"
+              <form onSubmit={handleLogin} className="flex flex-col gap-3">
+                <div>
+                  <label className="retro-label block mb-1" style={{ color: 'var(--black)' }}>USERNAME</label>
+                  <input
+                    id="username-input"
+                    type="text"
+                    required
+                    value={username}
+                    onChange={e => setUsername(e.target.value)}
+                    className="retro-input"
+                    placeholder={
+                      selectedRole === 'patient' ? 'e.g. patient1' :
+                      selectedRole === 'doctor'  ? 'e.g. doctor1'  :
+                      selectedRole === 'hospital'? 'e.g. hospital1': 'admin'
+                    }
+                  />
+                </div>
+
+                <div>
+                  <label className="retro-label block mb-1" style={{ color: 'var(--black)' }}>PASSWORD</label>
+                  <input
+                    id="password-input"
+                    type="password"
+                    required
+                    value={password}
+                    onChange={e => setPassword(e.target.value)}
+                    className="retro-input"
+                    placeholder="••••••••"
+                  />
+                </div>
+
+                {error && (
+                  <div
+                    className="pixel-border"
+                    style={{
+                      backgroundColor: error.startsWith('>>') ? 'var(--btn-green)' : 'var(--btn-red)',
+                      color: 'var(--black)',
+                      fontFamily: 'var(--font-retro)',
+                      fontSize: 16,
+                      padding: '8px 12px',
+                      letterSpacing: 1,
+                    }}
+                  >
+                    {error}
+                  </div>
+                )}
+
+                <button
+                  id="login-submit-btn"
+                  type="submit"
+                  disabled={isLoading}
+                  className="retro-btn retro-btn-red pixel-border retro-btn-full"
+                  style={{ opacity: isLoading ? 0.6 : 1 }}
+                >
+                  {isLoading ? 'SIGNING IN...' : '▶ SIGN IN'}
+                </button>
+              </form>
+
+              {/* Demo accounts */}
+              <div
+                className="pixel-inset"
+                style={{
+                  backgroundColor: 'var(--map-bg)',
+                  color: 'var(--white)',
+                  padding: '10px 14px',
+                  fontSize: 16,
+                  letterSpacing: 1,
+                }}
               >
-                {isLoading ? "Seeding..." : seeded ? "✅ Database Ready" : "Seed Demo Database (First Time Setup)"}
-              </button>
-              {error && (
-                <p className={`mt-3 text-xs text-center font-medium ${error.startsWith('✅') ? 'text-green-400' : 'text-red-400'}`}>{error}</p>
-              )}
-            </div>
-          </div>
-        ) : (
-          /* Step 2: Username + Password */
-          <div>
-            <button
-              onClick={() => { setSelectedRole(null); setError(""); }}
-              className="flex items-center gap-2 text-gray-500 hover:text-white text-sm font-medium mb-8 transition"
+                <div style={{ color: 'var(--btn-orange)', marginBottom: 6 }}>[ DEMO ACCOUNTS ]</div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4, fontSize: 15 }}>
+                  <span>patient1–4</span><span>admin</span>
+                  <span>doctor1–3</span><span>hospital1–2</span>
+                </div>
+                <div style={{ color: 'rgba(255,255,255,0.5)', marginTop: 6, fontSize: 14 }}>
+                  PWD: <span style={{ color: 'var(--white)' }}>password</span>
+                </div>
+              </div>
+            </>
+          )}
+
+          {/* Error without role selected */}
+          {!selectedRole && error && (
+            <div
+              className="pixel-border"
+              style={{
+                backgroundColor: error.startsWith('>>') ? 'var(--btn-green)' : 'var(--btn-red)',
+                color: 'var(--black)',
+                fontFamily: 'var(--font-retro)',
+                fontSize: 16,
+                padding: '8px 12px',
+              }}
             >
-              ← Back
-            </button>
-
-            <div className="flex items-center gap-3 mb-8 p-4 rounded-2xl border border-white/10 bg-white/5">
-              <span className="text-2xl">{roles.find(r => r.id === selectedRole)?.icon}</span>
-              <div>
-                <div className="font-bold text-white capitalize">{selectedRole} Login</div>
-                <div className="text-xs text-gray-500">{roles.find(r => r.id === selectedRole)?.desc}</div>
-              </div>
+              {error}
             </div>
+          )}
+        </div>
 
-            <form onSubmit={handleLogin} className="space-y-5">
-              <div>
-                <label className="block text-sm font-bold text-gray-400 mb-2">Username</label>
-                <input
-                  type="text"
-                  required
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
-                  className="w-full px-4 py-4 bg-white/5 border border-white/10 rounded-xl focus:ring-2 focus:ring-red-500 outline-none transition text-white placeholder-gray-600"
-                  placeholder={
-                    selectedRole === 'patient' ? 'e.g. patient1' :
-                    selectedRole === 'doctor' ? 'e.g. doctor1' :
-                    selectedRole === 'hospital' ? 'e.g. hospital1' : 'admin'
-                  }
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-bold text-gray-400 mb-2">Password</label>
-                <input
-                  type="password"
-                  required
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="w-full px-4 py-4 bg-white/5 border border-white/10 rounded-xl focus:ring-2 focus:ring-red-500 outline-none transition text-white placeholder-gray-600"
-                  placeholder="••••••••"
-                />
-              </div>
-
-              {error && (
-                <div className="p-3 bg-red-900/30 border border-red-500/40 text-red-300 rounded-lg text-sm">
-                  {error}
-                </div>
-              )}
-
-              <button
-                type="submit"
-                disabled={isLoading}
-                className="w-full py-4 bg-red-600 hover:bg-red-500 font-black text-lg rounded-xl transition disabled:opacity-50 shadow-lg shadow-red-900/30"
-              >
-                {isLoading ? "Signing in..." : "Sign In"}
-              </button>
-            </form>
-
-            <div className="mt-6 p-4 bg-white/5 rounded-xl border border-white/10">
-              <p className="text-xs text-gray-500 font-bold mb-2 uppercase tracking-wider">Demo Accounts</p>
-              <div className="grid grid-cols-2 gap-1 text-xs text-gray-400">
-                <span>patient1–4</span>
-                <span>admin</span>
-                <span>doctor1–3</span>
-                <span>hospital1–2</span>
-              </div>
-              <p className="text-xs text-gray-600 mt-2">Password: <span className="text-gray-400 font-bold">password</span></p>
-            </div>
-          </div>
-        )}
+        {/* Footer */}
+        <div
+          className="mt-5 text-center"
+          style={{
+            backgroundColor: 'var(--map-bg)',
+            color: 'rgba(255,255,255,0.5)',
+            fontSize: 15,
+            padding: '8px 12px',
+            letterSpacing: 1,
+            boxShadow: '0 -4px 0 var(--black), 0 4px 0 var(--black), -4px 0 0 var(--black), 4px 0 0 var(--black)',
+          }}
+        >
+          © DAILY BUGLE TRACKING SYSTEMS · COLOMBO
+        </div>
       </div>
     </div>
   );
