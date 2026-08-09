@@ -30,6 +30,8 @@ export default function DoctorDashboardPage() {
   // Time Ranges State
   const [newRangeStart, setNewRangeStart] = useState("");
   const [newRangeEnd, setNewRangeEnd] = useState("");
+  const [newRangeType, setNewRangeType] = useState<"both" | "online" | "in-person">("both");
+  const [newRangeAddress, setNewRangeAddress] = useState("");
   const [isSavingSlot, setIsSavingSlot] = useState(false);
 
   useEffect(() => {
@@ -129,7 +131,12 @@ export default function DoctorDashboardPage() {
         return;
       }
 
-      const newRange = { start: sNew, end: eNew };
+      const newRange = { 
+        start: sNew, 
+        end: eNew,
+        type: newRangeType,
+        address: newRangeType !== "online" ? newRangeAddress || "123 Fake Medical St, Metropolis" : ""
+      };
       let updatedProfile = { ...profile };
 
       if (user.role === 'hospital' && doctorId) {
@@ -145,7 +152,7 @@ export default function DoctorDashboardPage() {
 
       await setDoc(doc(db, "DoctorProfiles", user.uid), updatedProfile, { merge: true });
       setProfile(updatedProfile);
-      setNewRangeStart(""); setNewRangeEnd("");
+      setNewRangeStart(""); setNewRangeEnd(""); setNewRangeType("both"); setNewRangeAddress("");
     } catch { alert("Failed to add time range."); }
     finally { setIsSavingSlot(false); }
   };
@@ -485,10 +492,14 @@ export default function DoctorDashboardPage() {
                              <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: 15 }}>NO TIME RANGES SET</div>
                           ) : (
                              docItem.ranges.map((r: any, idx: number) => (
-                               <div key={idx} className="flex gap-4 items-center mb-2" style={{ backgroundColor: 'rgba(0,0,0,0.3)', padding: '6px 12px' }}>
+                               <div key={idx} className="flex gap-4 items-center mb-2 flex-wrap" style={{ backgroundColor: 'rgba(0,0,0,0.3)', padding: '6px 12px' }}>
                                  <span style={{ color: 'var(--btn-green)', fontSize: 18 }}>{r.start}</span>
                                  <span style={{ color: 'var(--white)' }}>TO</span>
                                  <span style={{ color: 'var(--btn-red)', fontSize: 18 }}>{r.end}</span>
+                                 <span style={{ color: 'var(--btn-cyan)', fontSize: 14 }}>[{r.type?.toUpperCase() || 'BOTH'}]</span>
+                                 {(r.type === 'in-person' || r.type === 'both' || !r.type) && r.address && (
+                                   <span style={{ color: 'rgba(255,255,255,0.5)', fontSize: 14 }}>📍 {r.address}</span>
+                                 )}
                                  <button onClick={() => removeRange(idx, docItem.id)} className="retro-btn retro-btn-red pixel-border ml-auto" style={{ padding: '2px 8px', fontSize: 14 }}>✕</button>
                                </div>
                              ))
@@ -496,16 +507,30 @@ export default function DoctorDashboardPage() {
                         </div>
 
                         {/* Add Range Form */}
-                        <form onSubmit={(e) => handleAddRange(e, docItem.id)} className="flex gap-3 items-end">
+                        <form onSubmit={(e) => handleAddRange(e, docItem.id)} className="flex gap-3 items-end flex-wrap">
                           <div>
-                            <label className="retro-label block mb-1" style={{ fontSize: 14 }}>START TIME</label>
+                            <label className="retro-label block mb-1" style={{ fontSize: 14 }}>START</label>
                             <input type="time" required value={newRangeStart} onChange={e => setNewRangeStart(e.target.value)} className="retro-input" style={{ padding: '4px 8px' }} />
                           </div>
                           <div>
-                            <label className="retro-label block mb-1" style={{ fontSize: 14 }}>END TIME</label>
+                            <label className="retro-label block mb-1" style={{ fontSize: 14 }}>END</label>
                             <input type="time" required value={newRangeEnd} onChange={e => setNewRangeEnd(e.target.value)} className="retro-input" style={{ padding: '4px 8px' }} />
                           </div>
-                          <button type="submit" className="retro-btn retro-btn-white pixel-border" style={{ fontSize: 16, padding: '6px 12px' }}>+ ADD RANGE</button>
+                          <div>
+                            <label className="retro-label block mb-1" style={{ fontSize: 14 }}>TYPE</label>
+                            <select value={newRangeType} onChange={e => setNewRangeType(e.target.value as any)} className="retro-select" style={{ padding: '4px 8px' }}>
+                              <option value="both">Both</option>
+                              <option value="online">Online Only</option>
+                              <option value="in-person">In-Person Only</option>
+                            </select>
+                          </div>
+                          {newRangeType !== "online" && (
+                            <div>
+                              <label className="retro-label block mb-1" style={{ fontSize: 14 }}>ADDRESS</label>
+                              <input type="text" value={newRangeAddress} onChange={e => setNewRangeAddress(e.target.value)} className="retro-input" style={{ padding: '4px 8px' }} placeholder="123 Fake St..." />
+                            </div>
+                          )}
+                          <button type="submit" className="retro-btn retro-btn-white pixel-border" style={{ fontSize: 16, padding: '6px 12px' }}>+ ADD</button>
                         </form>
                       </div>
                     ))
@@ -521,10 +546,14 @@ export default function DoctorDashboardPage() {
                        <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: 15 }}>NO TIME RANGES SET</div>
                     ) : (
                        profile.ranges.map((r: any, idx: number) => (
-                         <div key={idx} className="flex gap-4 items-center mb-2" style={{ backgroundColor: 'rgba(0,0,0,0.3)', padding: '8px 16px' }}>
+                         <div key={idx} className="flex gap-4 items-center mb-2 flex-wrap" style={{ backgroundColor: 'rgba(0,0,0,0.3)', padding: '8px 16px' }}>
                            <span style={{ color: 'var(--btn-green)', fontSize: 20 }}>{r.start}</span>
                            <span style={{ color: 'var(--white)' }}>TO</span>
                            <span style={{ color: 'var(--btn-red)', fontSize: 20 }}>{r.end}</span>
+                           <span style={{ color: 'var(--btn-cyan)', fontSize: 16 }}>[{r.type?.toUpperCase() || 'BOTH'}]</span>
+                           {(r.type === 'in-person' || r.type === 'both' || !r.type) && r.address && (
+                             <span style={{ color: 'rgba(255,255,255,0.5)', fontSize: 16 }}>📍 {r.address}</span>
+                           )}
                            <button onClick={() => removeRange(idx, null)} className="retro-btn retro-btn-red pixel-border ml-auto" style={{ padding: '4px 10px', fontSize: 16 }}>✕ REMOVE</button>
                          </div>
                        ))
@@ -533,15 +562,29 @@ export default function DoctorDashboardPage() {
 
                   {/* Add Range Form */}
                   <form onSubmit={(e) => handleAddRange(e, null)} className="flex gap-4 items-end flex-wrap">
-                    <div className="flex-1" style={{ minWidth: 150 }}>
+                    <div className="flex-1" style={{ minWidth: 120 }}>
                       <label className="retro-label block mb-1">START TIME</label>
                       <input type="time" required value={newRangeStart} onChange={e => setNewRangeStart(e.target.value)} className="retro-input" />
                     </div>
-                    <div className="flex-1" style={{ minWidth: 150 }}>
+                    <div className="flex-1" style={{ minWidth: 120 }}>
                       <label className="retro-label block mb-1">END TIME</label>
                       <input type="time" required value={newRangeEnd} onChange={e => setNewRangeEnd(e.target.value)} className="retro-input" />
                     </div>
-                    <button type="submit" className="retro-btn retro-btn-white pixel-border" style={{ fontSize: 18 }}>+ ADD TIME RANGE</button>
+                    <div className="flex-1" style={{ minWidth: 150 }}>
+                      <label className="retro-label block mb-1">CONSULTATION TYPE</label>
+                      <select value={newRangeType} onChange={e => setNewRangeType(e.target.value as any)} className="retro-select">
+                        <option value="both">Both</option>
+                        <option value="online">Online Only</option>
+                        <option value="in-person">In-Person Only</option>
+                      </select>
+                    </div>
+                    {newRangeType !== "online" && (
+                      <div className="flex-1" style={{ minWidth: 200 }}>
+                        <label className="retro-label block mb-1">ADDRESS (OPTIONAL)</label>
+                        <input type="text" value={newRangeAddress} onChange={e => setNewRangeAddress(e.target.value)} className="retro-input" placeholder="123 Fake St, City..." />
+                      </div>
+                    )}
+                    <button type="submit" className="retro-btn retro-btn-white pixel-border" style={{ fontSize: 18 }}>+ ADD</button>
                   </form>
                 </div>
               )}
