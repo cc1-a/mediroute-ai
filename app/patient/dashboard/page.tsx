@@ -390,13 +390,28 @@ export default function PatientDashboard() {
                       Time: {ticket.appointment_time}
                     </div>
                     {ticket.room && <div style={{ color: 'rgba(255,255,255,0.7)', fontSize: 16 }}>{ticket.room}</div>}
-                    <button onClick={() => {
-                          setTicketId(ticket.id);
-                          setBookedStatus(ticket.status === 'booked' ? 'confirmed' : 'pending_confirmation');
-                          setConsultationType(ticket.consultation_type);
-                          setBookingSlot(ticket.appointment_time);
-                          setStep("results");
-                    }} className="retro-btn retro-btn-panel pixel-border w-fit mt-2" style={{ fontSize: 14 }}>VIEW TICKET / QR CODE</button>
+                    <div className="flex flex-col sm:flex-row gap-4 mt-2 items-start">
+                      {(ticket.consultation_type === "in-person" || !ticket.consultation_type) && (
+                        <div style={{ backgroundColor: 'var(--white)', padding: 10, display: 'inline-block' }}>
+                          <QRCodeSVG value={`TICKET:${ticket.id}|PATIENT:${user.uid}`} size={100} />
+                        </div>
+                      )}
+                      <div className="flex flex-col gap-2">
+                        {ticket.status === 'booked' && ticket.consultation_type === "google-meet" && (
+                          <a href={ticket.meetLink || "#"} target="_blank" rel="noopener noreferrer" className="retro-btn retro-btn-green pixel-border w-fit" style={{ fontSize: 14 }}>🎥 JOIN MEET</a>
+                        )}
+                        {ticket.status === 'booked' && ticket.consultation_type === "platform-video" && (
+                          <button onClick={() => router.push(`/patient/consultation/${ticket.id}`)} className="retro-btn retro-btn-blue pixel-border w-fit" style={{ fontSize: 14 }}>🖥️ JOIN VIDEO</button>
+                        )}
+                        <button onClick={() => {
+                              setTicketId(ticket.id);
+                              setBookedStatus(ticket.status === 'booked' ? 'confirmed' : 'pending_confirmation');
+                              setConsultationType(ticket.consultation_type);
+                              setBookingSlot(ticket.appointment_time);
+                              setStep("results");
+                        }} className="retro-btn retro-btn-panel pixel-border w-fit" style={{ fontSize: 14 }}>VIEW FULL TICKET</button>
+                      </div>
+                    </div>
                   </div>
                 ))}
               </div>
