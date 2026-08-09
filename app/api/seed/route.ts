@@ -10,12 +10,16 @@ const users = [
   
   { uid: 'admin', username: 'admin', role: 'admin', name: 'Nick Fury', location: 'Global' },
   
-  // 5 Doctors / Hospitals
   { uid: 'hospital1', username: 'hospital1', role: 'hospital', name: 'Asiri Central', location: 'Colombo 2' },
   { uid: 'hospital2', username: 'hospital2', role: 'hospital', name: 'Lanka Hospitals', location: 'Colombo 5' },
+  { uid: 'hospital3', username: 'hospital3', role: 'hospital', name: 'Nawaloka Hospital', location: 'Colombo 2' },
+
   { uid: 'doctor1', username: 'doctor1', role: 'doctor', name: 'Dr. Strange', location: 'Colombo 3' },
   { uid: 'doctor2', username: 'doctor2', role: 'doctor', name: 'Dr. Connors', location: 'Colombo 9' },
-  { uid: 'doctor3', username: 'doctor3', role: 'doctor', name: 'Dr. Octavius (Online Consult)', location: 'Colombo 1', isOnline: true },
+  { uid: 'doctor3', username: 'doctor3', role: 'doctor', name: 'Dr. Octavius', location: 'Colombo 1', isOnline: true },
+  { uid: 'doctor4', username: 'doctor4', role: 'doctor', name: 'Dr. Doom', location: 'Colombo 4' },
+  { uid: 'doctor5', username: 'doctor5', role: 'doctor', name: 'Dr. Xavier', location: 'Colombo 7', isOnline: true },
+  { uid: 'doctor6', username: 'doctor6', role: 'doctor', name: 'Dr. McCoy', location: 'Colombo 8' },
 ];
 
 const doctorProfiles = [
@@ -23,14 +27,23 @@ const doctorProfiles = [
     uid: 'hospital1', 
     doctors: [
       { id: 'doc_1', name: 'Dr. Reed Richards', specialty: 'General Practitioner', ranges: [{ start: '08:00', end: '12:00' }, { start: '13:00', end: '17:00' }] },
-      { id: 'doc_2', name: 'Dr. Susan Storm', specialty: 'Neurology', ranges: [{ start: '09:00', end: '15:00' }] }
+      { id: 'doc_2', name: 'Dr. Susan Storm', specialty: 'Neurology', ranges: [{ start: '09:00', end: '15:00' }] },
+      { id: 'doc_5', name: 'Dr. Johnny Storm', specialty: 'Dermatology', ranges: [{ start: '10:00', end: '14:00' }, { start: '16:00', end: '20:00' }] }
     ]
   },
   { 
     uid: 'hospital2', 
     doctors: [
       { id: 'doc_3', name: 'Dr. Bruce Banner', specialty: 'Cardiology', ranges: [{ start: '10:00', end: '16:00' }] },
-      { id: 'doc_4', name: 'Dr. Tony Stark', specialty: 'Orthopedics', ranges: [{ start: '14:00', end: '20:00' }] }
+      { id: 'doc_4', name: 'Dr. Tony Stark', specialty: 'Orthopedics', ranges: [{ start: '14:00', end: '20:00' }] },
+      { id: 'doc_6', name: 'Dr. Stephen Rogers', specialty: 'General Practitioner', ranges: [{ start: '07:00', end: '13:00' }] }
+    ]
+  },
+  { 
+    uid: 'hospital3', 
+    doctors: [
+      { id: 'doc_7', name: 'Dr. Jane Foster', specialty: 'Pediatrics', ranges: [{ start: '08:30', end: '14:30' }] },
+      { id: 'doc_8', name: 'Dr. Thor Odinson', specialty: 'Sports Medicine', ranges: [{ start: '12:00', end: '18:00' }] }
     ]
   },
   { 
@@ -49,6 +62,23 @@ const doctorProfiles = [
     ranges: [{ start: '16:00', end: '22:00' }], 
     isOnline: true, 
     meetLink: 'https://meet.google.com/abc-xyz-123' 
+  },
+  { 
+    uid: 'doctor4', 
+    specialty: 'Psychiatry', 
+    ranges: [{ start: '08:00', end: '12:00' }, { start: '14:00', end: '19:00' }] 
+  },
+  { 
+    uid: 'doctor5', 
+    specialty: 'Neurology', 
+    ranges: [{ start: '11:00', end: '15:00' }],
+    isOnline: true, 
+    meetLink: 'https://meet.google.com/xmen-link-456' 
+  },
+  { 
+    uid: 'doctor6', 
+    specialty: 'Cardiology', 
+    ranges: [{ start: '09:00', end: '17:00' }] 
   },
 ];
 
