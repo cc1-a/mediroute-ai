@@ -35,7 +35,6 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [seeded, setSeeded] = useState(false);
 
   const { login } = useAuth();
 
@@ -54,7 +53,7 @@ export default function LoginPage() {
       const q = query(collection(db, "Users"), where("username", "==", username));
       const snap = await getDocs(q);
       if (snap.empty) {
-        setError("!! USER NOT FOUND. SEED DATABASE FIRST.");
+        setError("!! USER NOT FOUND.");
       } else {
         const userDoc = snap.docs[0];
         const userData = { uid: userDoc.id, ...userDoc.data() };
@@ -67,23 +66,6 @@ export default function LoginPage() {
     }
   };
 
-  const handleSeed = async () => {
-    setIsLoading(true);
-    setError("");
-    try {
-      const res = await fetch('/api/seed');
-      if (res.ok) {
-        setSeeded(true);
-        setError(">> DATABASE SEEDED SUCCESSFULLY.");
-      } else {
-        setError("!! SEED FAILED.");
-      }
-    } catch (e: any) {
-      setError(e.message);
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
   const selectedRoleObj = roles.find(r => r.id === selectedRole);
 
@@ -145,19 +127,6 @@ export default function LoginPage() {
                   <span className="ml-auto">▶</span>
                 </button>
               ))}
-
-              {/* Seed Button */}
-              <div style={{ borderTop: '4px solid var(--black)', marginTop: 4, paddingTop: 12 }}>
-                <button
-                  id="seed-db-btn"
-                  onClick={handleSeed}
-                  disabled={isLoading || seeded}
-                  className="retro-btn retro-btn-blue pixel-border retro-btn-full"
-                  style={{ fontSize: 18, opacity: (isLoading || seeded) ? 0.6 : 1 }}
-                >
-                  {isLoading ? 'SEEDING...' : seeded ? '>> DB READY' : '[ SEED DEMO DATABASE ]'}
-                </button>
-              </div>
             </>
           ) : (
             /* ─ STEP 2: Login Form ─ */
