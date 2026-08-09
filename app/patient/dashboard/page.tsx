@@ -66,6 +66,7 @@ export default function PatientDashboard() {
   const [explanations, setExplanations] = useState<Record<string, string>>({});
   const [loadingExplanation, setLoadingExplanation] = useState<string>("");
   const [doctors, setDoctors] = useState<any[]>([]);
+  const [isBooking, setIsBooking] = useState<string | null>(null);
   const [loadingDoctors, setLoadingDoctors] = useState(false);
   const [selectedDoctorToBook, setSelectedDoctorToBook] = useState<any>(null);
   const [selectedDate, setSelectedDate] = useState("");
@@ -78,6 +79,7 @@ export default function PatientDashboard() {
 
   const [records, setRecords] = useState<any[]>([]);
   const [loadingRecords, setLoadingRecords] = useState(false);
+  const [upcomingTickets, setUpcomingTickets] = useState<any[]>([]);
 
   useEffect(() => { if (!user) router.push('/login'); }, [user, router]);
 
@@ -117,6 +119,19 @@ export default function PatientDashboard() {
     });
     return () => unsub();
   }, [ticketId, bookedStatus]);
+
+  useEffect(() => {
+    if (!user?.uid) return;
+    const q = query(
+      collection(db, "Tickets"),
+      where("patient_uid", "==", user.uid),
+      where("status", "in", ["pending_confirmation", "pending_admin", "pending_booking", "booked"])
+    );
+    const unsub = onSnapshot(q, (snap) => {
+      setUpcomingTickets(snap.docs.map(d => ({ id: d.id, ...(d.data() as any) })));
+    });
+    return () => unsub();
+  }, [user?.uid]);
 
   const fetchDoctors = async (triageResult: any, loc: string) => {
     setLoadingDoctors(true);
@@ -166,7 +181,13 @@ export default function PatientDashboard() {
             });
           }
       });
-      found.sort((a, b) => (a.isNearby && !b.isNearby) ? -1 : (!a.isNearby && b.isNearby) ? 1 : 0);
+      found.sort((a, b) => {
+        if (a.isRecommended && !b.isRecommended) return -1;
+        if (!a.isRecommended && b.isRecommended) return 1;
+        if (a.isNearby && !b.isNearby) return -1;
+        if (!a.isNearby && b.isNearby) return 1;
+        return 0;
+      });
       setDoctors(found);
     } catch (e) { console.error(e); }
     finally { setLoadingDoctors(false); }
@@ -259,7 +280,8 @@ export default function PatientDashboard() {
   };
 
   const handleBook = async (docObj: any, slot: any, type: "in-person" | "google-meet" | "platform-video") => {
-    if (!triage) return;
+    if (!triage || isBooking) return;
+    setIsBooking(slot.time);
     try {
       const res = await fetch("/api/book", {
         method: "POST", headers: { "Content-Type": "application/json" },
@@ -284,6 +306,7 @@ export default function PatientDashboard() {
       setBookedStatus("pending_confirmation");
       clearDraft();
     } catch (err: any) { alert(err.message || "Booking failed."); }
+    finally { setIsBooking(null); }
   };
 
   const handleExplainToggle = async (docObj: any) => {
@@ -354,6 +377,30 @@ export default function PatientDashboard() {
                 {user.name?.split(" ")[0].toUpperCase()}<span style={{ color: 'var(--btn-red)' }}>.</span>
               </div>
             </div>
+
+            {/* Upcoming Tickets */}
+            {upcomingTickets.length > 0 && (
+              <div className="mb-5 flex flex-col gap-3">
+                {upcomingTickets.map(ticket => (
+                  <div key={ticket.id} className="pixel-inset flex flex-col gap-2" style={{ backgroundColor: ticket.status === 'booked' ? 'rgba(54,226,106,0.2)' : 'rgba(240,224,96,0.2)', padding: '14px 18px' }}>
+                    <div style={{ color: ticket.status === 'booked' ? 'var(--btn-green)' : 'var(--btn-yellow)', fontSize: 18, letterSpacing: 2 }}>
+                      {ticket.status === 'booked' ? '✅ APPOINTMENT CONFIRMED' : '⏳ PENDING'}
+                    </div>
+                    <div style={{ color: 'var(--white)', fontSize: 20 }}>
+                      Time: {ticket.appointment_time}
+                    </div>
+                    {ticket.room && <div style={{ color: 'rgba(255,255,255,0.7)', fontSize: 16 }}>{ticket.room}</div>}
+                    <button onClick={() => {
+                          setTicketId(ticket.id);
+                          setBookedStatus(ticket.status === 'booked' ? 'confirmed' : 'pending_confirmation');
+                          setConsultationType(ticket.consultation_type);
+                          setBookingSlot(ticket.appointment_time);
+                          setStep("results");
+                    }} className="retro-btn retro-btn-panel pixel-border w-fit mt-2" style={{ fontSize: 14 }}>VIEW TICKET / QR CODE</button>
+                  </div>
+                ))}
+              </div>
+            )}
 
             {/* Action cards */}
             <div className="flex flex-col gap-4">
@@ -541,31 +588,31 @@ export default function PatientDashboard() {
                   </div>
                 </div>
 
+                {/* QR CODE - ALWAYS SHOW ONCE BOOKED/PENDING */}
+                {(consultationType === "in-person" || !consultationType) && (
+                  <div className="flex flex-col items-center gap-3 mt-4">
+                    <div style={{ backgroundColor: 'var(--white)', padding: 16, display: 'inline-block' }}>
+                      <QRCodeSVG value={`TICKET:${ticketId}|PATIENT:${user.uid}`} size={160} />
+                    </div>
+                    <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: 16, letterSpacing: 2 }}>
+                      {bookedStatus === "pending_confirmation" ? "RETAIN THIS QR CODE" : "SHOW THIS QR CODE AT THE COUNTER"}
+                    </div>
+                  </div>
+                )}
+
                 {bookedStatus === "confirmed" && (
                   <>
                     {consultationType === "google-meet" ? (
                       <a href={bookedDoctor?.meetLink || "#"} target="_blank" rel="noopener noreferrer"
-                         className="retro-btn retro-btn-green pixel-border retro-btn-full" style={{ fontSize: 22, display: 'block', textAlign: 'center' }}>
+                         className="retro-btn retro-btn-green pixel-border retro-btn-full mt-4" style={{ fontSize: 22, display: 'block', textAlign: 'center' }}>
                         🎥 JOIN GOOGLE MEET
                       </a>
                     ) : consultationType === "platform-video" ? (
                       <button onClick={() => router.push(`/patient/consultation/${ticketId}`)}
-                              className="retro-btn retro-btn-blue pixel-border retro-btn-full" style={{ fontSize: 22 }}>
+                              className="retro-btn retro-btn-blue pixel-border retro-btn-full mt-4" style={{ fontSize: 22 }}>
                         🖥️ JOIN PLATFORM VIDEO
                       </button>
-                    ) : (
-                      <div className="flex flex-col items-center gap-3">
-                        <div style={{ backgroundColor: 'var(--white)', padding: 16, display: 'inline-block' }}>
-                          <QRCodeSVG value={`TICKET:${ticketId}|PATIENT:${user.uid}`} size={160} />
-                        </div>
-                        <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: 16, letterSpacing: 2 }}>
-                          SHOW THIS QR CODE AT THE COUNTER
-                        </div>
-                      </div>
-                    )}
-                    <div style={{ color: 'rgba(255,255,255,0.3)', fontSize: 15, letterSpacing: 1 }}>
-                      TICKET: {ticketId}
-                    </div>
+                    ) : null}
                   </>
                 )}
 
@@ -735,19 +782,22 @@ export default function PatientDashboard() {
                               <>
                                 {!selectedDoctorToBook.isOnlineOnly && (
                                   <button onClick={() => handleBook(selectedDoctorToBook, slot, "in-person")}
-                                          className="retro-btn retro-btn-panel pixel-border" style={{ fontSize: 15 }}>
-                                    IN-PERSON
+                                          disabled={!!isBooking}
+                                          className="retro-btn retro-btn-panel pixel-border" style={{ fontSize: 15, opacity: isBooking ? 0.5 : 1 }}>
+                                    {isBooking === slot.time ? '...' : 'IN-PERSON'}
                                   </button>
                                 )}
                                 {selectedDoctorToBook.isOnline && (
                                   <>
                                     <button onClick={() => handleBook(selectedDoctorToBook, slot, "google-meet")}
-                                            className="retro-btn retro-btn-green pixel-border" style={{ fontSize: 15 }}>
-                                      G-MEET
+                                            disabled={!!isBooking}
+                                            className="retro-btn retro-btn-green pixel-border" style={{ fontSize: 15, opacity: isBooking ? 0.5 : 1 }}>
+                                      {isBooking === slot.time ? '...' : 'G-MEET'}
                                     </button>
                                     <button onClick={() => handleBook(selectedDoctorToBook, slot, "platform-video")}
-                                            className="retro-btn retro-btn-blue pixel-border" style={{ fontSize: 15, color: 'var(--white)' }}>
-                                      VIDEO
+                                            disabled={!!isBooking}
+                                            className="retro-btn retro-btn-blue pixel-border" style={{ fontSize: 15, color: 'var(--white)', opacity: isBooking ? 0.5 : 1 }}>
+                                      {isBooking === slot.time ? '...' : 'VIDEO'}
                                     </button>
                                   </>
                                 )}
