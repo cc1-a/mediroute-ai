@@ -94,11 +94,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 <>
                   <Link href="/doctor/dashboard" id="nav-doctor-dash">
                     <span className="retro-btn retro-btn-cyan pixel-border" style={{ fontSize: 16, letterSpacing: 1 }}>
-                      {user.role === 'hospital' ? 'HOSPITAL' : 'DASHBOARD'}
+                      {user.role === 'hospital' ? 'HOSPITAL DASHBOARD' : 'DASHBOARD'}
                     </span>
-                  </Link>
-                  <Link href="/doctor/schedule" id="nav-schedule">
-                    <span className="retro-btn retro-btn-panel pixel-border" style={{ fontSize: 16, letterSpacing: 1 }}>SCHEDULE</span>
                   </Link>
                 </>
               )}
