@@ -16,9 +16,11 @@
 
 ## Database Schema (Firebase Firestore)
 - `Users`: `{ uid, role (patient|doctor|hospital|admin), name, location (Colombo sub-parts) }`
-- `DoctorProfiles`: `{ uid, specialty, available_slots: [{ time, duration_mins, booked }], hospital_id (if part of hospital) }`
-- `Tickets`: `{ ticket_id, patient_uid, patient_name, raw_symptoms, ai_summary, urgency_level, required_specialty, location, status (pending_admin|pending_booking|booked|completed), assigned_doc_uid, appointment_time, emergency_flag, timestamp }`
-- `MedicalLogs`: `{ log_id, ticket_id, patient_uid, final_diagnosis, medicine, timestamp }`
+- `DoctorProfiles`: 
+  - Standalone: `{ uid, specialty, ranges: [{ start, end }] }`
+  - Hospital: `{ uid, doctors: [{ id, name, specialty, ranges: [{ start, end }] }] }`
+- `Tickets`: `{ ticket_id, patient_uid, patient_name, raw_symptoms, core_symptoms, urgency_level, required_specialty, location, status (pending_confirmation|pending_admin|pending_booking|booked|completed), assigned_doc_uid, subDocId (if hospital), appointment_time, emergency_flag, timestamp }`
+- `MedicalLogs`: `{ log_id, ticket_id, patient_uid, patient_name, final_diagnosis, medicine, location, timestamp }`
 
 ## Pinecone (Vector Database)
 - Index Name: `medical-radar` (1024 dimensions)

@@ -8,13 +8,15 @@
 │   ├── globals.css              # Spider-Man Theme tokens & Web patterns
 │   ├── api/
 │   │   ├── triage/route.ts      # AI Triage & Clarification logic
+│   │   ├── book/route.ts        # Booking & Double-booking validation logic
+│   │   ├── explain-recommendation/route.ts # AI Recommendation explainer
 │   │   └── seed/route.ts        # Database seeder endpoint
 │   ├── patient/
-│   │   ├── triage/page.tsx      # Triage Input & Follow-up Questions UI
-│   │   └── booking/page.tsx     # Hospital/Doctor Slot Selection UI
+│   │   ├── triage/page.tsx      # Legacy Triage Input UI
+│   │   ├── dashboard/page.tsx   # Triage, Location, Booking & Timetable UI
+│   │   └── booking/page.tsx     # Legacy Booking UI
 │   ├── doctor/
-│   │   ├── dashboard/page.tsx   # Doctor Queue, Diagnosis & Medicine UI
-│   │   └── schedule/page.tsx    # Doctor Slot Management UI
+│   │   └── dashboard/page.tsx   # Doctor Queue, Schedule Manager & Ranges UI
 │   └── admin/
 │       ├── radar/page.tsx       # Outbreak Radar
 │       └── queue/page.tsx       # Admin Emergency Approval Queue

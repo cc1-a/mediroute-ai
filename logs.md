@@ -7,10 +7,13 @@
 - [x] Updated Documentation (Pre-flight checks passed).
 
 ## Current Bugs & Todos (Phase 2 Goal)
-- [ ] Implement Spider-Man UI Theme globally.
-- [ ] Build Seeding script (4 Patients, 1 Admin, 5 Doctors/Hospitals).
-- [ ] Refactor AI Triage API for Follow-Up Question flow.
-- [ ] Build Admin Emergency Queue.
-- [ ] Build Doctor Slot Scheduling UI.
-- [ ] Build Patient Booking UI.
-- [ ] Build Doctor Final Diagnosis & Medicine UI.
+- [x] Implement Spider-Man UI Theme globally.
+- [x] Build Seeding script (4 Patients, 1 Admin, 6 Doctors/Hospitals).
+- [x] Refactor AI Triage API for Follow-Up Question flow and Cookie state persistence.
+- [x] Build Doctor Slot Scheduling UI (Dynamic ranges and Sub-doctors).
+- [x] Build Patient Booking UI (Dynamic slot slicing and date picking).
+- [x] Build Admin Emergency Queue.
+- [x] Build Doctor Final Diagnosis & Medicine UI.
+- [x] Fix Doctor filtering logic to sort by location instead of strictly excluding.
+- [x] Fix Backend Double-Booking Race Condition on `/api/book`.
+- [x] Refactor AI Recommendation Explanations to use dedicated "SHOW" toggle.

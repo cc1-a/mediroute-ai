@@ -1,26 +1,24 @@
 # User Journeys & Workflows (V2)
 
-## A. Intelligent AI Triage & Admin Review (Patient Side)
-1. Patient enters symptoms.
-2. AI (Groq) evaluates. If vague, AI returns `follow_up_questions`.
-3. Patient can answer questions (re-evaluate) or SKIP.
-4. If SKIP, ticket is immediately marked for `General Doctor`.
-5. Triage is finalized and vector is sent to Pinecone. 
-6. Ticket is created with status `pending_admin`.
-7. Admin sees the ticket in their queue and can flag it as `EMERGENCY` or `Standard`.
-8. Once Admin reviews, ticket status changes to `pending_booking`.
+## A. Intelligent AI Triage (Patient Side)
+1. Patient clicks "Find Doctor" and enters symptoms.
+2. AI (Groq) evaluates. If vague, AI asks `follow_up_questions` incrementally.
+3. Triage progress is saved to a persistent browser Cookie, allowing patients to resume without losing state.
+4. Once AI is confident, it produces a structured summary (core symptoms, urgency, required specialty).
 
-## B. Booking & Availability Flow
-1. Doctors/Hospitals log in and set their `available_slots` (e.g., 9:00 AM, 15 mins).
-2. After Admin review, Patient sees a list of available Doctors/Hospitals in their Colombo sub-region matching the specialty.
-3. Patient selects a time slot and books it (`status -> booked`).
-4. Hospitals can handle multiple ticketing lines concurrently.
+## B. Doctor Search & Dynamic Booking
+1. Patient selects their location (e.g. "Colombo 1").
+2. The UI fetches all doctors and hospitals, sorting them by `Nearby` and `Online`.
+3. AI generates custom explanations for "Recommended" doctors, toggleable on their card.
+4. Patient clicks "View Timetable & Book" on a specific doctor.
+5. Patient picks a date. System dynamically slices the doctor's set `ranges` by the estimated appointment duration to generate selectable slots.
+6. System checks Firestore to prevent double-booking. If successful, creates ticket (`status -> pending_confirmation`).
 
 ## C. Doctor Dashboard & Diagnosis
-1. Doctor/Hospital sees their booked appointments in real-time.
-2. Doctor clicks "Start Consultation".
-3. After consultation, Doctor writes `Diagnosis` and `Medicine`.
-4. Ticket is finalized and pushed to `MedicalLogs`.
+1. Doctors/Hospitals log into their dashboard to manage `QUEUE` and `SCHEDULE`.
+2. In `SCHEDULE`, Hospitals can add sub-doctors and time ranges. Freelance docs just manage their own ranges.
+3. In `QUEUE`, they can see and confirm pending bookings.
+4. During consultation, Doctor writes `Diagnosis` and `Medicine`, finalizing the ticket to `MedicalLogs`.
 
 ## D. Seeding & Mock Data
 - We will seed 4 Patients (1 with history).
