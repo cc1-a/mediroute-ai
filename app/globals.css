@@ -328,3 +328,57 @@ body {
     repeating-linear-gradient(45deg, transparent, transparent 40px, rgba(255,255,255,0.03) 40px, rgba(255,255,255,0.03) 41px),
     repeating-linear-gradient(-45deg, transparent, transparent 40px, rgba(255,255,255,0.03) 40px, rgba(255,255,255,0.03) 41px);
 }
+
+/* =============================================
+   SPIDER-WEB / NETWORK SCAN ANIMATION
+   ============================================= */
+.spider-web-loader {
+  position: relative;
+  width: 100px;
+  height: 100px;
+  margin: 0 auto;
+}
+
+.spider-web-loader::before,
+.spider-web-loader::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  border: 2px solid var(--btn-red);
+  border-radius: 50%;
+  opacity: 0;
+  animation: radar-ping 2s cubic-bezier(0, 0, 0.2, 1) infinite;
+}
+
+.spider-web-loader::after {
+  animation-delay: 1s;
+  border-color: var(--btn-cyan);
+}
+
+.spider-web-core {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 20px;
+  height: 20px;
+  background-color: var(--btn-red);
+  border-radius: 50%;
+  box-shadow: 0 0 15px var(--btn-red);
+  animation: pixel-pulse 1s infinite;
+}
+
+@keyframes radar-ping {
+  0% {
+    width: 0;
+    height: 0;
+    opacity: 1;
+  }
+  100% {
+    width: 150px;
+    height: 150px;
+    opacity: 0;
+  }
+}

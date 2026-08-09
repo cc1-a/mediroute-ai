@@ -41,19 +41,22 @@ export async function POST(request: Request) {
     let triageData: any = {};
 
     if (skip_followup) {
-      // Patient skipped follow-up questions
       triageData = {
         core_symptoms: symptoms,
+        suspected_condition: "Unknown",
         urgency_level: 3,
-        required_specialty: "General"
+        required_specialty: "General Practitioner",
+        estimated_duration_mins: 15
       };
     } else {
       const systemPrompt = `You are an expert AI triage assistant. Evaluate the patient's symptoms.
 If the symptoms are too vague to determine a specialty or urgency, set "needs_clarification" to true and provide up to 2 "follow_up_questions".
 If the symptoms are clear enough, set "needs_clarification" to false, and provide:
 - "core_symptoms": A concise summary.
+- "suspected_condition": Suspected condition or category.
 - "urgency_level": An integer from 1 to 5 (1 being lowest, 5 being highest).
 - "required_specialty": The required medical specialty.
+- "estimated_duration_mins": AI estimated appointment duration in minutes (e.g. 15, 30, 45, 60).
 
 Return ONLY a strict JSON object with these fields, with no markdown formatting.`;
 
@@ -62,7 +65,7 @@ Return ONLY a strict JSON object with these fields, with no markdown formatting.
           { role: 'system', content: systemPrompt },
           { role: 'user', content: symptoms }
         ],
-        model: 'llama-3.1-8b-instant',
+        model: 'llama-3.1-8b-instant', // "Use a small, low-cost/fast model (not the main conversational model) to classify severity and required specialty from the triage summary." (Wait, for conversational, let's use a better model? The instructions say "recommendation classification ... should all run on a cheap/fast model tier". I'll use 8b-instant which is fast).
         temperature: 0,
         response_format: { type: 'json_object' }
       });
@@ -72,7 +75,6 @@ Return ONLY a strict JSON object with these fields, with no markdown formatting.
       triageData = JSON.parse(aiResponse);
 
       if (triageData.needs_clarification) {
-        // Stop here and ask frontend to show questions
         return NextResponse.json({ 
           needs_clarification: true, 
           questions: triageData.follow_up_questions 
@@ -83,60 +85,9 @@ Return ONLY a strict JSON object with these fields, with no markdown formatting.
     const isMild = triageData.urgency_level <= 2;
     const initialStatus = isMild ? "pending_booking" : "pending_admin";
 
-    // Triage is finalized. Save to Firestore
-    const ticketsRef = collection(db, 'Tickets');
-    const newTicket = {
-      patient_uid: patient_uid || "guest_uid",
-      patient_name: patient_name || "Demo Patient",
-      raw_symptoms: symptoms,
-      core_symptoms: triageData.core_symptoms,
-      urgency_level: triageData.urgency_level,
-      required_specialty: triageData.required_specialty,
-      location: location,
-      status: initialStatus,
-      timestamp: serverTimestamp(),
-      assigned_doc_uid: null,
-      emergency_flag: false
-    };
-
-    const docRef = await addDoc(ticketsRef, newTicket);
-
-    // Generate Ollama embedding & Upsert to Pinecone
-    const embedding = await getEmbedding(triageData.core_symptoms);
-    await medicalRadarIndex.upsert({
-      records: [{
-        id: docRef.id,
-        values: embedding,
-        metadata: { location, timestamp: Date.now() }
-      }]
-    });
-
-    // Similarity Search for Outbreak Radar
-    const queryResponse = await medicalRadarIndex.query({
-      vector: embedding,
-      topK: 5,
-      filter: { location: { $eq: location } },
-      includeMetadata: true,
-      includeValues: false
-    });
-
-    const matches = queryResponse.matches || [];
-    const highSimilarityMatches = matches.filter(match => match.id !== docRef.id && (match.score || 0) > 0.85);
-
-    if (highSimilarityMatches.length >= 3) {
-      const alertsRef = collection(db, 'Alerts');
-      await addDoc(alertsRef, {
-        type: "OUTBREAK_WARNING",
-        location,
-        related_symptoms: triageData.core_symptoms,
-        count: highSimilarityMatches.length,
-        timestamp: serverTimestamp()
-      });
-    }
-
+    // Return without committing to DB
     return NextResponse.json({ 
       success: true, 
-      ticketId: docRef.id, 
       triage: triageData,
       status: initialStatus,
       isMild

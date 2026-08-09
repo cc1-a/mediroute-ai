@@ -22,9 +22,14 @@ export default function DoctorDashboardPage() {
   const { user } = useAuth();
 
   const [profile, setProfile] = useState<any>(null);
-  const [newSlotTime, setNewSlotTime] = useState("");
-  const [newSlotDuration, setNewSlotDuration] = useState("15");
-  const [newSlotRoom, setNewSlotRoom] = useState("Room 1");
+  
+  // Hospital - Add Doctor State
+  const [newDocName, setNewDocName] = useState("");
+  const [newDocSpecialty, setNewDocSpecialty] = useState("General Practitioner");
+  
+  // Time Ranges State
+  const [newRangeStart, setNewRangeStart] = useState("");
+  const [newRangeEnd, setNewRangeEnd] = useState("");
   const [isSavingSlot, setIsSavingSlot] = useState(false);
 
   useEffect(() => {
@@ -74,28 +79,68 @@ export default function DoctorDashboardPage() {
     finally { setIsCompleting(false); }
   };
 
-  const handleAddSlot = async (e: React.FormEvent) => {
+  const handleAddDoctor = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newSlotTime || !profile || !user?.uid) return;
+    if (!newDocName || !user?.uid) return;
     setIsSavingSlot(true);
     try {
-      const formattedTime = format(new Date(newSlotTime), "hh:mm a, MMM dd");
-      const newSlot = { time: formattedTime, duration_mins: parseInt(newSlotDuration), room: newSlotRoom, booked: false };
-      const updatedSlots = [...(profile.available_slots || []), newSlot];
-      await setDoc(doc(db, "DoctorProfiles", user.uid), { ...profile, available_slots: updatedSlots }, { merge: true });
-      setProfile({ ...profile, available_slots: updatedSlots });
-      setNewSlotTime("");
-    } catch { alert("Failed to add slot."); }
+      const newDoctor = {
+        id: Date.now().toString(),
+        name: newDocName,
+        specialty: newDocSpecialty,
+        ranges: []
+      };
+      const updatedDoctors = [...(profile?.doctors || []), newDoctor];
+      await setDoc(doc(db, "DoctorProfiles", user.uid), { ...profile, doctors: updatedDoctors }, { merge: true });
+      setProfile({ ...profile, doctors: updatedDoctors });
+      setNewDocName("");
+    } catch { alert("Failed to add doctor."); }
     finally { setIsSavingSlot(false); }
   };
 
-  const removeSlot = async (index: number) => {
+  const handleAddRange = async (e: React.FormEvent, doctorId: string | null) => {
+    e.preventDefault();
+    if (!newRangeStart || !newRangeEnd || !profile || !user?.uid) return;
+    setIsSavingSlot(true);
+    try {
+      const newRange = { start: newRangeStart, end: newRangeEnd };
+      let updatedProfile = { ...profile };
+
+      if (user.role === 'hospital' && doctorId) {
+        const doctors = [...(profile.doctors || [])];
+        const docIdx = doctors.findIndex((d: any) => d.id === doctorId);
+        if (docIdx >= 0) {
+          doctors[docIdx].ranges = [...(doctors[docIdx].ranges || []), newRange];
+          updatedProfile.doctors = doctors;
+        }
+      } else {
+        updatedProfile.ranges = [...(profile.ranges || []), newRange];
+      }
+
+      await setDoc(doc(db, "DoctorProfiles", user.uid), updatedProfile, { merge: true });
+      setProfile(updatedProfile);
+      setNewRangeStart(""); setNewRangeEnd("");
+    } catch { alert("Failed to add time range."); }
+    finally { setIsSavingSlot(false); }
+  };
+
+  const removeRange = async (rangeIdx: number, doctorId: string | null) => {
     if (!profile || !user?.uid) return;
     try {
-      const updatedSlots = profile.available_slots.filter((_: any, i: number) => i !== index);
-      await setDoc(doc(db, "DoctorProfiles", user.uid), { ...profile, available_slots: updatedSlots }, { merge: true });
-      setProfile({ ...profile, available_slots: updatedSlots });
-    } catch { alert("Failed to remove slot"); }
+      let updatedProfile = { ...profile };
+      if (user.role === 'hospital' && doctorId) {
+        const doctors = [...(profile.doctors || [])];
+        const docIdx = doctors.findIndex((d: any) => d.id === doctorId);
+        if (docIdx >= 0) {
+          doctors[docIdx].ranges = doctors[docIdx].ranges.filter((_: any, i: number) => i !== rangeIdx);
+          updatedProfile.doctors = doctors;
+        }
+      } else {
+        updatedProfile.ranges = (profile.ranges || []).filter((_: any, i: number) => i !== rangeIdx);
+      }
+      await setDoc(doc(db, "DoctorProfiles", user.uid), updatedProfile, { merge: true });
+      setProfile(updatedProfile);
+    } catch { alert("Failed to remove range"); }
   };
 
   const dashboardTitle = user?.role === 'hospital' ? 'HOSPITAL DASHBOARD' : 'DOCTOR DASHBOARD';
@@ -358,130 +403,122 @@ export default function DoctorDashboardPage() {
         <div style={{ flex: 1, overflowY: 'auto', padding: '24px', backgroundColor: 'var(--bg-dark)' }}>
           <div className="max-w-5xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-6">
 
-            {/* Add Slot Form */}
-            <div className="md:col-span-1">
-              <div className="pixel-inset" style={{ backgroundColor: 'var(--map-bg)', padding: 20 }}>
-                <div style={{ color: 'var(--btn-orange)', fontSize: 22, letterSpacing: 3, marginBottom: 16 }}>
-                  [ ADD SLOT ]
-                </div>
-
-                <form onSubmit={handleAddSlot} className="flex flex-col gap-4">
-                  <div>
-                    <label className="retro-label block mb-1" style={{ color: 'rgba(255,255,255,0.5)' }}>DATE & TIME</label>
-                    <input
-                      type="datetime-local" required value={newSlotTime}
-                      onChange={e => setNewSlotTime(e.target.value)}
-                      className="retro-input"
-                    />
+            <div className="md:col-span-3 flex flex-col gap-6">
+              
+              {user?.role === 'hospital' && (
+                <div className="pixel-inset" style={{ backgroundColor: 'var(--map-bg)', padding: 20 }}>
+                  <div style={{ color: 'var(--btn-orange)', fontSize: 22, letterSpacing: 3, marginBottom: 16 }}>
+                    [ ADD DOCTOR ]
                   </div>
-
-                  <div>
-                    <label className="retro-label block mb-1" style={{ color: 'rgba(255,255,255,0.5)' }}>DURATION (MINS)</label>
-                    <select value={newSlotDuration} onChange={e => setNewSlotDuration(e.target.value)} className="retro-select">
-                      <option value="10">10 MINS (QUICK)</option>
-                      <option value="15">15 MINS (STANDARD)</option>
-                      <option value="30">30 MINS (EXTENDED)</option>
-                      <option value="60">60 MINS (SPECIALIST)</option>
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="retro-label block mb-1" style={{ color: 'rgba(255,255,255,0.5)' }}>ROOM / LINE</label>
-                    <input
-                      type="text" required value={newSlotRoom}
-                      onChange={e => setNewSlotRoom(e.target.value)}
-                      placeholder="E.G. ROOM 1, LINE A"
-                      className="retro-input"
-                    />
-                  </div>
-
-                  <button
-                    id="add-slot-btn"
-                    type="submit"
-                    disabled={isSavingSlot}
-                    className="retro-btn retro-btn-white pixel-border retro-btn-full"
-                    style={{ fontSize: 20, opacity: isSavingSlot ? 0.6 : 1 }}
-                  >
-                    {isSavingSlot ? 'ADDING...' : '▶ ADD TO SCHEDULE'}
-                  </button>
-                </form>
-              </div>
-            </div>
-
-            {/* Schedule Table */}
-            <div className="md:col-span-2">
-              <div style={{ color: 'var(--white)', fontSize: 24, letterSpacing: 3, marginBottom: 16, fontFamily: 'var(--font-retro)' }}>
-                CURRENT SCHEDULE CONFIG
-              </div>
-
-              <div className="pixel-inset overflow-hidden" style={{ backgroundColor: 'var(--map-bg)' }}>
-                {/* Table header */}
-                <div
-                  className="grid font-bold"
-                  style={{
-                    gridTemplateColumns: '2fr 1fr 1fr 1fr auto',
-                    backgroundColor: 'rgba(0,0,0,0.5)',
-                    padding: '10px 14px',
-                    borderBottom: '3px solid var(--black)',
-                    color: 'rgba(255,255,255,0.4)',
-                    fontSize: 14,
-                    letterSpacing: 2,
-                    fontFamily: 'var(--font-retro)',
-                  }}
-                >
-                  <span>TIME</span><span>ROOM</span><span>DURATION</span><span>STATUS</span><span>ACT.</span>
-                </div>
-
-                {(!profile?.available_slots || profile.available_slots.length === 0) ? (
-                  <div style={{ padding: '40px', textAlign: 'center', color: 'rgba(255,255,255,0.3)', fontSize: 18, letterSpacing: 2, fontFamily: 'var(--font-retro)' }}>
-                    NO SLOTS CONFIGURED. ADD ONE FROM THE SIDEBAR.
-                  </div>
-                ) : (
-                  profile.available_slots.map((slot: any, idx: number) => (
-                    <div
-                      key={idx}
-                      className="grid items-center"
-                      style={{
-                        gridTemplateColumns: '2fr 1fr 1fr 1fr auto',
-                        padding: '10px 14px',
-                        borderBottom: '2px solid rgba(40,68,105,0.5)',
-                        fontFamily: 'var(--font-retro)',
-                      }}
-                    >
-                      <span style={{ color: 'var(--white)', fontSize: 18 }}>{slot.time}</span>
-                      <span style={{ color: 'var(--btn-cyan)', fontSize: 17 }}>{slot.room || "Room 1"}</span>
-                      <span style={{ color: 'rgba(255,255,255,0.5)', fontSize: 17 }}>{slot.duration_mins || 15}m</span>
-                      <span>
-                        <span
-                          className="retro-badge"
-                          style={{
-                            backgroundColor: slot.booked ? 'var(--btn-red)' : 'var(--btn-green)',
-                            color: slot.booked ? 'var(--white)' : 'var(--black)',
-                            fontSize: 14,
-                          }}
-                        >
-                          {slot.booked ? 'BOOKED' : 'AVAIL'}
-                        </span>
-                      </span>
-                      <button
-                        onClick={() => removeSlot(idx)}
-                        className="retro-btn retro-btn-red pixel-border"
-                        style={{ fontSize: 15, color: 'var(--white)', padding: '3px 8px' }}
-                      >
-                        ✕
-                      </button>
+                  <form onSubmit={handleAddDoctor} className="flex gap-4 flex-wrap items-end">
+                    <div className="flex-1" style={{ minWidth: 200 }}>
+                      <label className="retro-label block mb-1">DOCTOR NAME</label>
+                      <input type="text" required value={newDocName} onChange={e => setNewDocName(e.target.value)} className="retro-input" placeholder="DR. JOHN DOE" />
                     </div>
-                  ))
-                )}
+                    <div className="flex-1" style={{ minWidth: 200 }}>
+                      <label className="retro-label block mb-1">SPECIALTY</label>
+                      <select value={newDocSpecialty} onChange={e => setNewDocSpecialty(e.target.value)} className="retro-select">
+                        <option value="General Practitioner">General Practitioner</option>
+                        <option value="Cardiologist">Cardiologist</option>
+                        <option value="Dermatologist">Dermatologist</option>
+                        <option value="Neurologist">Neurologist</option>
+                        <option value="Pediatrician">Pediatrician</option>
+                        <option value="Orthopedic">Orthopedic</option>
+                      </select>
+                    </div>
+                    <button type="submit" disabled={isSavingSlot} className="retro-btn retro-btn-cyan pixel-border" style={{ fontSize: 20 }}>
+                      ▶ ADD
+                    </button>
+                  </form>
+                </div>
+              )}
+
+              <div style={{ color: 'var(--white)', fontSize: 24, letterSpacing: 3, marginBottom: 8, fontFamily: 'var(--font-retro)' }}>
+                {user?.role === 'hospital' ? 'HOSPITAL DOCTORS & TIMETABLES' : 'YOUR TIMETABLE'}
               </div>
 
-              {/* Pro tip */}
-              <div className="pixel-inset mt-5" style={{ backgroundColor: 'rgba(40,68,105,0.4)', padding: '14px 18px' }}>
-                <div style={{ color: 'var(--btn-cyan)', fontSize: 18, letterSpacing: 2, marginBottom: 6 }}>ℹ PRO TIP FOR HOSPITALS</div>
-                <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: 17, letterSpacing: 1, lineHeight: 1.5 }}>
-                  Use the ROOM / LINE field to direct patients to specific departments — e.g. &quot;Cardiology - Dr. Smith&quot; or &quot;Room 402&quot;. Patients see this on their confirmed ticket.
+              {user?.role === 'hospital' ? (
+                <div className="flex flex-col gap-6">
+                  {(!profile?.doctors || profile.doctors.length === 0) ? (
+                    <div className="pixel-inset" style={{ padding: '40px', textAlign: 'center', backgroundColor: 'var(--map-bg)', color: 'rgba(255,255,255,0.3)', fontSize: 18, letterSpacing: 2 }}>
+                      NO DOCTORS ADDED YET.
+                    </div>
+                  ) : (
+                    profile.doctors.map((docItem: any) => (
+                      <div key={docItem.id} className="pixel-inset" style={{ backgroundColor: 'var(--map-bg)', padding: 20, borderLeft: '4px solid var(--btn-cyan)' }}>
+                        <div className="flex justify-between items-center mb-4">
+                          <div>
+                            <div style={{ fontSize: 24, color: 'var(--white)', letterSpacing: 2 }}>{docItem.name}</div>
+                            <div style={{ fontSize: 16, color: 'var(--btn-cyan)', letterSpacing: 1 }}>{docItem.specialty}</div>
+                          </div>
+                        </div>
+
+                        {/* Ranges List */}
+                        <div className="mb-4">
+                          {(!docItem.ranges || docItem.ranges.length === 0) ? (
+                             <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: 15 }}>NO TIME RANGES SET</div>
+                          ) : (
+                             docItem.ranges.map((r: any, idx: number) => (
+                               <div key={idx} className="flex gap-4 items-center mb-2" style={{ backgroundColor: 'rgba(0,0,0,0.3)', padding: '6px 12px' }}>
+                                 <span style={{ color: 'var(--btn-green)', fontSize: 18 }}>{r.start}</span>
+                                 <span style={{ color: 'var(--white)' }}>TO</span>
+                                 <span style={{ color: 'var(--btn-red)', fontSize: 18 }}>{r.end}</span>
+                                 <button onClick={() => removeRange(idx, docItem.id)} className="retro-btn retro-btn-red pixel-border ml-auto" style={{ padding: '2px 8px', fontSize: 14 }}>✕</button>
+                               </div>
+                             ))
+                          )}
+                        </div>
+
+                        {/* Add Range Form */}
+                        <form onSubmit={(e) => handleAddRange(e, docItem.id)} className="flex gap-3 items-end">
+                          <div>
+                            <label className="retro-label block mb-1" style={{ fontSize: 14 }}>START TIME</label>
+                            <input type="time" required value={newRangeStart} onChange={e => setNewRangeStart(e.target.value)} className="retro-input" style={{ padding: '4px 8px' }} />
+                          </div>
+                          <div>
+                            <label className="retro-label block mb-1" style={{ fontSize: 14 }}>END TIME</label>
+                            <input type="time" required value={newRangeEnd} onChange={e => setNewRangeEnd(e.target.value)} className="retro-input" style={{ padding: '4px 8px' }} />
+                          </div>
+                          <button type="submit" className="retro-btn retro-btn-white pixel-border" style={{ fontSize: 16, padding: '6px 12px' }}>+ ADD RANGE</button>
+                        </form>
+                      </div>
+                    ))
+                  )}
                 </div>
-              </div>
+              ) : (
+                <div className="pixel-inset" style={{ backgroundColor: 'var(--map-bg)', padding: 20 }}>
+                  <div style={{ fontSize: 20, color: 'var(--btn-orange)', letterSpacing: 2, marginBottom: 16 }}>AVAILABLE TIME RANGES</div>
+                  
+                  {/* Ranges List */}
+                  <div className="mb-6">
+                    {(!profile?.ranges || profile.ranges.length === 0) ? (
+                       <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: 15 }}>NO TIME RANGES SET</div>
+                    ) : (
+                       profile.ranges.map((r: any, idx: number) => (
+                         <div key={idx} className="flex gap-4 items-center mb-2" style={{ backgroundColor: 'rgba(0,0,0,0.3)', padding: '8px 16px' }}>
+                           <span style={{ color: 'var(--btn-green)', fontSize: 20 }}>{r.start}</span>
+                           <span style={{ color: 'var(--white)' }}>TO</span>
+                           <span style={{ color: 'var(--btn-red)', fontSize: 20 }}>{r.end}</span>
+                           <button onClick={() => removeRange(idx, null)} className="retro-btn retro-btn-red pixel-border ml-auto" style={{ padding: '4px 10px', fontSize: 16 }}>✕ REMOVE</button>
+                         </div>
+                       ))
+                    )}
+                  </div>
+
+                  {/* Add Range Form */}
+                  <form onSubmit={(e) => handleAddRange(e, null)} className="flex gap-4 items-end flex-wrap">
+                    <div className="flex-1" style={{ minWidth: 150 }}>
+                      <label className="retro-label block mb-1">START TIME</label>
+                      <input type="time" required value={newRangeStart} onChange={e => setNewRangeStart(e.target.value)} className="retro-input" />
+                    </div>
+                    <div className="flex-1" style={{ minWidth: 150 }}>
+                      <label className="retro-label block mb-1">END TIME</label>
+                      <input type="time" required value={newRangeEnd} onChange={e => setNewRangeEnd(e.target.value)} className="retro-input" />
+                    </div>
+                    <button type="submit" className="retro-btn retro-btn-white pixel-border" style={{ fontSize: 18 }}>+ ADD TIME RANGE</button>
+                  </form>
+                </div>
+              )}
             </div>
 
           </div>

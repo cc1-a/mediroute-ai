@@ -7,6 +7,7 @@ import { db } from "@/lib/firebase";
 import { collection, query, where, getDocs, onSnapshot, updateDoc, doc } from "firebase/firestore";
 import dynamic from 'next/dynamic';
 import { QRCodeSVG } from 'qrcode.react';
+import { format } from 'date-fns';
 
 const MapWithNoSSR = dynamic(() => import("@/components/Map"), {
   ssr: false,
@@ -20,7 +21,7 @@ const MapWithNoSSR = dynamic(() => import("@/components/Map"), {
   ),
 });
 
-type Step = "dashboard" | "symptoms" | "followup" | "location" | "results" | "records";
+type Step = "dashboard" | "symptoms" | "followup" | "location" | "results" | "timetable" | "records";
 
 /* ── Shared retro screen wrapper ── */
 const RetroScreen = ({ children, title }: { children: React.ReactNode; title?: string }) => (
@@ -61,8 +62,15 @@ export default function PatientDashboard() {
   const [triage, setTriage] = useState<any>(null);
   const [ticketId, setTicketId] = useState<string>("");
   const [isMild, setIsMild] = useState(false);
+  const [expandedDoctors, setExpandedDoctors] = useState<Record<string, boolean>>({});
+  const [explanations, setExplanations] = useState<Record<string, string>>({});
+  const [loadingExplanation, setLoadingExplanation] = useState<string>("");
   const [doctors, setDoctors] = useState<any[]>([]);
   const [loadingDoctors, setLoadingDoctors] = useState(false);
+  const [selectedDoctorToBook, setSelectedDoctorToBook] = useState<any>(null);
+  const [selectedDate, setSelectedDate] = useState("");
+  const [availableSlots, setAvailableSlots] = useState<{time: string, booked: boolean}[]>([]);
+  const [loadingSlots, setLoadingSlots] = useState(false);
   const [bookingSlot, setBookingSlot] = useState<string>("");
   const [bookedDoctor, setBookedDoctor] = useState<any>(null);
   const [bookedStatus, setBookedStatus] = useState<"none" | "pending_confirmation" | "confirmed">("none");
@@ -72,6 +80,33 @@ export default function PatientDashboard() {
   const [loadingRecords, setLoadingRecords] = useState(false);
 
   useEffect(() => { if (!user) router.push('/login'); }, [user, router]);
+
+  // Restore draft from cookie
+  useEffect(() => {
+    const match = document.cookie.match(new RegExp('(^| )draftSession=([^;]+)'));
+    if (match) {
+      try {
+        const draft = JSON.parse(decodeURIComponent(match[2]));
+        if (draft.step) setStep(draft.step);
+        if (draft.symptoms) setSymptoms(draft.symptoms);
+        if (draft.locationName) setLocationName(draft.locationName);
+        if (draft.triage) setTriage(draft.triage);
+        if (draft.isMild !== undefined) setIsMild(draft.isMild);
+      } catch(e) {}
+    }
+  }, []);
+
+  const saveDraft = (data: any) => {
+    const match = document.cookie.match(new RegExp('(^| )draftSession=([^;]+)'));
+    let current = {};
+    if (match) { try { current = JSON.parse(decodeURIComponent(match[2])); } catch(e){} }
+    const updated = { ...current, ...data };
+    document.cookie = `draftSession=${encodeURIComponent(JSON.stringify(updated))}; path=/; max-age=86400`;
+  };
+
+  const clearDraft = () => {
+    document.cookie = "draftSession=; path=/; max-age=0";
+  };
 
   useEffect(() => {
     if (!ticketId || bookedStatus === "none") return;
@@ -98,23 +133,42 @@ export default function PatientDashboard() {
         const isNearby = matchingUser.location === loc || !loc;
         const isOnline = pData.isOnline || matchingUser.isOnline;
         if (isNearby || isOnline) {
+          if (matchingUser.role === "hospital") {
+          const hospDoctors = pData.doctors || [];
+          hospDoctors.forEach((hd: any) => {
+            let isRecommended = false;
+            if (triageResult) {
+              const reqSpec = triageResult.required_specialty || "";
+              if (triageResult.urgency_level > 2 && hd.specialty === reqSpec) isRecommended = true;
+            }
+            found.push({
+              uid: p.id,
+              subDocId: hd.id,
+              name: `${hd.name} (${matchingUser.name})`,
+              role: 'hospital_doctor',
+              specialty: hd.specialty,
+              location: matchingUser.location,
+              ranges: hd.ranges || [],
+              isOnline, meetLink: pData.meetLink, isNearby, isRecommended
+            });
+          });
+        } else {
+          let isRecommended = false;
+          if (triageResult) {
+            const reqSpec = triageResult.required_specialty || "";
+            if (triageResult.urgency_level <= 2 && pData.specialty === "General Practitioner") isRecommended = true;
+            else if (triageResult.urgency_level > 2 && pData.specialty === reqSpec) isRecommended = true;
+          }
           found.push({
-            uid: p.id, name: matchingUser.name, role: matchingUser.role,
+            uid: p.id, subDocId: null, name: matchingUser.name, role: matchingUser.role,
             specialty: pData.specialty, location: matchingUser.location,
-            slots: (pData.available_slots || []).filter((s: any) => !s.booked),
-            isOnline, meetLink: pData.meetLink, isNearby,
+            ranges: pData.ranges || [],
+            isOnline, meetLink: pData.meetLink, isNearby, isRecommended
           });
         }
+      }
       });
       found.sort((a, b) => (a.isNearby && !b.isNearby) ? -1 : (!a.isNearby && b.isNearby) ? 1 : 0);
-      if (found.length === 0) {
-        profilesSnap.docs.forEach(p => {
-          const pData = p.data() as any;
-          const matchingUser = allDoctorUsers.find(u => u.uid === p.id);
-          if (!matchingUser) return;
-          found.push({ uid: p.id, name: matchingUser.name, role: matchingUser.role, specialty: pData.specialty, location: matchingUser.location, slots: (pData.available_slots || []).filter((s: any) => !s.booked), isOnline: pData.isOnline || matchingUser.isOnline, meetLink: pData.meetLink, isNearby: false });
-        });
-      }
       setDoctors(found);
     } catch (e) { console.error(e); }
     finally { setLoadingDoctors(false); }
@@ -136,29 +190,128 @@ export default function PatientDashboard() {
       if (data.needs_clarification) {
         setQuestions(data.questions || []);
         setStep("followup");
+        saveDraft({ step: "followup", symptoms: finalSymptoms });
       } else {
-        setTriage(data.triage); setTicketId(data.ticketId); setIsMild(data.isMild);
+        setTriage(data.triage); setIsMild(data.isMild);
         setStep("location");
+        saveDraft({ step: "location", symptoms: finalSymptoms, triage: data.triage, isMild: data.isMild });
       }
     } catch (err: any) { setError(err.message); }
     finally { setIsSubmitting(false); }
   };
 
   const handleLocationSubmit = async () => {
+    saveDraft({ locationName });
     await fetchDoctors(triage, locationName);
     setStep("results");
   };
 
-  const handleBook = async (docObj: any, slot: any, type: "in-person" | "google-meet" | "platform-video") => {
-    if (!ticketId) return;
+  const handleViewTimetable = (docObj: any) => {
+    setSelectedDoctorToBook(docObj);
+    setSelectedDate("");
+    setAvailableSlots([]);
+    setStep("timetable");
+  };
+
+  const generateSlots = async (dateString: string) => {
+    setSelectedDate(dateString);
+    if (!selectedDoctorToBook || !dateString) return;
+    setLoadingSlots(true);
     try {
-      await updateDoc(doc(db, "Tickets", ticketId), {
-        status: "pending_confirmation", assigned_doc_uid: docObj.uid,
-        appointment_time: slot.time, consultation_type: type, room: slot.room || "Room 1",
+      const dur = triage?.estimated_duration_mins || 15;
+      const slots: {time: string, booked: boolean}[] = [];
+      const ranges = selectedDoctorToBook.ranges || [];
+
+      // Create format for time like "hh:mm a, MMM dd"
+      const dateObj = new Date(dateString);
+      const datePrefix = format(dateObj, "MMM dd");
+
+      const now = new Date();
+      for (const r of ranges) {
+         let current = new Date(`${dateString}T${r.start}`);
+         const end = new Date(`${dateString}T${r.end}`);
+         while (current < end) {
+            if (current > now) {
+              const timeStr = format(current, "hh:mm a");
+              slots.push({time: `${timeStr}, ${datePrefix}`, booked: false});
+            }
+            current.setMinutes(current.getMinutes() + dur);
+         }
+      }
+
+      const ticketsQ = query(collection(db, "Tickets"), where("assigned_doc_uid", "==", selectedDoctorToBook.uid));
+      const ticketsSnap = await getDocs(ticketsQ);
+      
+      const bookedTimes = new Set();
+      ticketsSnap.docs.forEach(d => {
+         const data = d.data();
+         if (selectedDoctorToBook.subDocId && data.subDocId !== selectedDoctorToBook.subDocId) return;
+         if (data.status !== "cancelled") {
+            bookedTimes.add(data.appointment_time);
+         }
       });
+
+      slots.forEach(s => {
+         if (bookedTimes.has(s.time)) s.booked = true;
+      });
+
+      setAvailableSlots(slots);
+    } catch(e) {}
+    setLoadingSlots(false);
+  };
+
+  const handleBook = async (docObj: any, slot: any, type: "in-person" | "google-meet" | "platform-video") => {
+    if (!triage) return;
+    try {
+      const res = await fetch("/api/book", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          patient_uid: user?.uid,
+          patient_name: user?.name,
+          symptoms: symptoms,
+          triage: triage,
+          location: locationName || "Sri Lanka",
+          assigned_doc_uid: docObj.uid,
+          subDocId: docObj.subDocId || null,
+          appointment_time: slot.time,
+          consultation_type: type,
+          room: docObj.role === "hospital_doctor" ? docObj.name.split(" (")[0] : "Room 1"
+        })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Booking failed");
+      
+      setTicketId(data.ticketId);
       setBookingSlot(slot.time); setBookedDoctor(docObj); setConsultationType(type);
       setBookedStatus("pending_confirmation");
+      clearDraft();
     } catch { alert("Booking failed."); }
+  };
+
+  const handleExplainToggle = async (docObj: any) => {
+    const key = docObj.subDocId || docObj.uid;
+    const isExpanded = expandedDoctors[key];
+    if (isExpanded) {
+       setExpandedDoctors(prev => ({...prev, [key]: false}));
+       return;
+    }
+    
+    setExpandedDoctors(prev => ({...prev, [key]: true}));
+    
+    if (!explanations[key]) {
+      setLoadingExplanation(key);
+      try {
+        const res = await fetch("/api/explain-recommendation", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ triageSummary: triage, providerName: docObj.name, providerSpecialty: docObj.specialty })
+        });
+        const data = await res.json();
+        setExplanations(prev => ({...prev, [key]: data.explanation}));
+      } catch(e) {
+      } finally {
+        setLoadingExplanation("");
+      }
+    }
   };
 
   const fetchRecords = async () => {
@@ -263,15 +416,22 @@ export default function PatientDashboard() {
                 </div>
               )}
 
-              <button
-                id="submit-symptoms-btn"
-                disabled={!symptoms || isSubmitting}
-                onClick={() => handleInitialSubmit(false)}
-                className="retro-btn retro-btn-red pixel-border retro-btn-full"
-                style={{ opacity: (!symptoms || isSubmitting) ? 0.5 : 1 }}
-              >
-                {isSubmitting ? 'ANALYZING WEB...' : '▶ RUN AI TRIAGE'}
-              </button>
+                <button
+                  id="submit-symptoms-btn"
+                  disabled={!symptoms || isSubmitting}
+                  onClick={() => handleInitialSubmit(false)}
+                  className="retro-btn retro-btn-red pixel-border retro-btn-full"
+                  style={{ opacity: (!symptoms || isSubmitting) ? 0.5 : 1 }}
+                >
+                  {isSubmitting ? (
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px' }}>
+                      <div className="spider-web-loader" style={{ width: '30px', height: '30px' }}>
+                        <div className="spider-web-core" style={{ width: '10px', height: '10px' }}></div>
+                      </div>
+                      ANALYZING WEB...
+                    </div>
+                  ) : '▶ RUN AI TRIAGE'}
+                </button>
             </div>
           </RetroScreen>
         )}
@@ -431,8 +591,13 @@ export default function PatientDashboard() {
                 )}
 
                 {loadingDoctors ? (
-                  <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: 20, textAlign: 'center', padding: '40px 0', letterSpacing: 2 }}>
-                    SCANNING NETWORK...
+                  <div style={{ padding: '60px 0', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '20px' }}>
+                    <div className="spider-web-loader">
+                      <div className="spider-web-core"></div>
+                    </div>
+                    <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: 20, letterSpacing: 2 }}>
+                      SCANNING NETWORK...
+                    </div>
                   </div>
                 ) : doctors.length === 0 ? (
                   <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: 20, textAlign: 'center', padding: '40px 0' }}>
@@ -456,7 +621,17 @@ export default function PatientDashboard() {
                             <div style={{ color: 'var(--btn-cyan)', fontSize: 18, letterSpacing: 1 }}>{d.specialty}</div>
                             {d.location && <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: 15 }}>📍 {d.location}</div>}
                           </div>
-                          <div className="ml-auto flex flex-col gap-1">
+                          <div className="ml-auto flex flex-col gap-1 items-end">
+                            {d.isRecommended && (
+                              <div className="flex items-center gap-2">
+                                <span className="retro-badge pixel-pulse" style={{ backgroundColor: 'var(--btn-yellow)', color: 'var(--black)', fontSize: 13, border: '2px solid var(--black)' }}>
+                                  ⭐ RECOMMENDED
+                                </span>
+                                <button onClick={() => handleExplainToggle(d)} className="retro-btn" style={{ padding: '2px 8px', fontSize: 12, backgroundColor: 'var(--map-bg)', color: 'var(--btn-yellow)', border: '1px solid var(--btn-yellow)' }}>
+                                  {expandedDoctors[d.subDocId || d.uid] ? "HIDE" : "SHOW"}
+                                </button>
+                              </div>
+                            )}
                             {d.isNearby && (
                               <span className="retro-badge" style={{ backgroundColor: 'var(--btn-red)', color: 'var(--white)', fontSize: 13 }}>📍 NEARBY</span>
                             )}
@@ -466,48 +641,115 @@ export default function PatientDashboard() {
                           </div>
                         </div>
 
-                        {/* Slots */}
-                        {d.slots.length === 0 ? (
-                          <div style={{ color: 'rgba(255,255,255,0.3)', fontSize: 17 }}>NO SLOTS AVAILABLE</div>
-                        ) : (
-                          <div className="flex flex-col gap-2">
-                            <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: 15, letterSpacing: 2 }}>BOOK A SLOT:</div>
-                            {d.slots.map((slot: any, i: number) => (
-                              <div key={i} className="flex flex-col sm:flex-row gap-2 items-start sm:items-center" style={{ borderTop: '2px solid rgba(40,68,105,0.8)', paddingTop: 8 }}>
-                                <div style={{ color: 'var(--white)', fontSize: 18, flex: 1 }}>
-                                  {slot.time} <span style={{ color: 'rgba(255,255,255,0.4)' }}>({slot.duration_mins || 15}m)</span>
-                                  {slot.room && <span style={{ color: 'var(--btn-cyan)', marginLeft: 8, fontSize: 15 }}>[{slot.room}]</span>}
+                        {d.isRecommended && expandedDoctors[d.subDocId || d.uid] && (
+                           <div className="mb-4" style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                              {loadingExplanation === (d.subDocId || d.uid) ? (
+                                <div style={{ color: 'var(--btn-yellow)', fontSize: 14 }}>Generating explanation...</div>
+                              ) : explanations[d.subDocId || d.uid] ? (
+                                <div className="pixel-inset" style={{ backgroundColor: 'rgba(0,0,0,0.3)', color: 'var(--white)', padding: '10px', fontSize: 16, maxWidth: '80%', fontStyle: 'italic', borderLeft: '4px solid var(--btn-yellow)' }}>
+                                  "{explanations[d.subDocId || d.uid]}"
                                 </div>
-                                <div className="flex gap-2 flex-wrap">
-                                  {!d.isOnlineOnly && (
-                                    <button onClick={() => handleBook(d, slot, "in-person")}
-                                            className="retro-btn retro-btn-panel pixel-border" style={{ fontSize: 15 }}>
-                                      IN-PERSON
-                                    </button>
-                                  )}
-                                  {d.isOnline && (
-                                    <>
-                                      <button onClick={() => handleBook(d, slot, "google-meet")}
-                                              className="retro-btn retro-btn-green pixel-border" style={{ fontSize: 15 }}>
-                                        G-MEET
-                                      </button>
-                                      <button onClick={() => handleBook(d, slot, "platform-video")}
-                                              className="retro-btn retro-btn-blue pixel-border" style={{ fontSize: 15, color: 'var(--white)' }}>
-                                        VIDEO
-                                      </button>
-                                    </>
-                                  )}
-                                </div>
-                              </div>
-                            ))}
-                          </div>
+                              ) : null}
+                           </div>
                         )}
+
+                        {/* Slots Action */}
+                        <div className="flex flex-col gap-2 mt-4" style={{ borderTop: '2px solid rgba(40,68,105,0.8)', paddingTop: 16 }}>
+                          <button onClick={() => handleViewTimetable(d)} className="retro-btn retro-btn-cyan pixel-border" style={{ fontSize: 18 }}>
+                            ▶ VIEW TIMETABLE & BOOK
+                          </button>
+                        </div>
                       </div>
                     ))}
                   </div>
                 )}
               </>
             )}
+          </RetroScreen>
+        )}
+
+        {/* ── TIMETABLE STEP ── */}
+        {step === "timetable" && selectedDoctorToBook && (
+          <RetroScreen title="BOOKING TIMETABLE">
+            <BackBtn onClick={() => setStep("results")} />
+            
+            <div className="pixel-inset" style={{ backgroundColor: 'var(--map-bg)', padding: 24 }}>
+              <div className="flex justify-between items-center mb-6" style={{ borderBottom: '2px solid rgba(255,255,255,0.2)', paddingBottom: 16 }}>
+                <div>
+                  <div style={{ color: 'var(--white)', fontSize: 26, letterSpacing: 2 }}>{selectedDoctorToBook.name}</div>
+                  <div style={{ color: 'var(--btn-cyan)', fontSize: 18, letterSpacing: 1 }}>{selectedDoctorToBook.specialty}</div>
+                </div>
+                {selectedDoctorToBook.isOnline && (
+                  <span className="retro-badge" style={{ backgroundColor: 'var(--btn-green)', color: 'var(--black)', fontSize: 13 }}>● ONLINE</span>
+                )}
+              </div>
+
+              <div className="mb-6">
+                <label className="retro-label block mb-2">SELECT DATE</label>
+                <input 
+                  type="date" 
+                  className="retro-input" 
+                  value={selectedDate} 
+                  onChange={(e) => generateSlots(e.target.value)}
+                  min={new Date().toISOString().split("T")[0]}
+                />
+              </div>
+
+              {selectedDate && (
+                <div>
+                  <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: 18, letterSpacing: 2, marginBottom: 16 }}>
+                    AVAILABLE SLOTS FOR {new Date(selectedDate).toLocaleDateString()}
+                  </div>
+
+                  {loadingSlots ? (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, color: 'var(--btn-cyan)' }}>
+                      <div className="spider-web-loader" style={{ width: 24, height: 24 }}>
+                        <div className="spider-web-core" style={{ width: 8, height: 8 }}></div>
+                      </div>
+                      LOADING SLOTS...
+                    </div>
+                  ) : availableSlots.length === 0 ? (
+                    <div style={{ color: 'rgba(255,255,255,0.3)', fontSize: 17 }}>NO SLOTS AVAILABLE ON THIS DATE</div>
+                  ) : (
+                    <div className="flex flex-col gap-3">
+                      {availableSlots.map((slot: any, i: number) => (
+                        <div key={i} className="flex flex-col sm:flex-row gap-2 items-start sm:items-center" style={{ backgroundColor: slot.booked ? 'rgba(226,54,54,0.1)' : 'rgba(0,0,0,0.3)', padding: 12 }}>
+                          <div style={{ color: slot.booked ? 'rgba(255,255,255,0.4)' : 'var(--white)', fontSize: 20, flex: 1, textDecoration: slot.booked ? 'line-through' : 'none' }}>
+                            {slot.time.split(",")[0]} <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: 16 }}>({triage?.estimated_duration_mins || 15}m)</span>
+                          </div>
+                          <div className="flex gap-2 flex-wrap">
+                            {slot.booked ? (
+                              <span style={{ color: 'var(--btn-red)', fontSize: 16, letterSpacing: 2, padding: '4px 12px' }}>BOOKED</span>
+                            ) : (
+                              <>
+                                {!selectedDoctorToBook.isOnlineOnly && (
+                                  <button onClick={() => handleBook(selectedDoctorToBook, slot, "in-person")}
+                                          className="retro-btn retro-btn-panel pixel-border" style={{ fontSize: 15 }}>
+                                    IN-PERSON
+                                  </button>
+                                )}
+                                {selectedDoctorToBook.isOnline && (
+                                  <>
+                                    <button onClick={() => handleBook(selectedDoctorToBook, slot, "google-meet")}
+                                            className="retro-btn retro-btn-green pixel-border" style={{ fontSize: 15 }}>
+                                      G-MEET
+                                    </button>
+                                    <button onClick={() => handleBook(selectedDoctorToBook, slot, "platform-video")}
+                                            className="retro-btn retro-btn-blue pixel-border" style={{ fontSize: 15, color: 'var(--white)' }}>
+                                      VIDEO
+                                    </button>
+                                  </>
+                                )}
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
           </RetroScreen>
         )}
 
